@@ -67,6 +67,7 @@ export interface Database {
           is_active?: boolean
           updated_at?: string
         }
+        Relationships: []
       }
       pemasok: {
         Row: {
@@ -110,6 +111,7 @@ export interface Database {
           is_active?: boolean
           updated_at?: string
         }
+        Relationships: []
       }
       pembelian: {
         Row: {
@@ -181,6 +183,7 @@ export interface Database {
           catatan?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
       pricing: {
         Row: {
@@ -209,6 +212,7 @@ export interface Database {
           updated_at?: string
           updated_by?: string | null
         }
+        Relationships: []
       }
     }
     Views: {
@@ -223,6 +227,7 @@ export interface Database {
           tanggal_pembelian: string
           pembelian_id: string
         }
+        Relationships: []
       }
       v_pricing_matrix: {
         Row: {
@@ -241,6 +246,7 @@ export interface Database {
           status_harga: StatusHarga
           pricing_updated_at: string | null
         }
+        Relationships: []
       }
     }
     Functions: {
