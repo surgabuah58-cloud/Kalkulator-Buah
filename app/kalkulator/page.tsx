@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, Calculator, CheckCircle2, Sun, CloudRain, RotateCcw } from 'lucide-react'
+import { AlertTriangle, Calculator, CheckCircle2, Sun, CloudRain, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ============================================================
@@ -27,7 +27,7 @@ const DEFAULT_STATE = {
   berat_bruto_per_kemasan: '',     // berat bruto 1 kemasan (kg)
   // Biaya
   harga_beli_per_peti: '',
-  biaya_transport_per_peti: '',
+  biaya_transport_borongan: '',  // total biaya angkut 1 trip (BBM + sopir + retribusi)
   total_biaya_regu_sortir: '',
   nilai_recovery_afkir: '',
 }
@@ -70,7 +70,7 @@ export default function KalkulatorPage() {
       jumlahPeti,
       hargaBeliPerPeti:       r(values.harga_beli_per_peti)     || 0,
       beratBrutoTotal,
-      biayaTransportPerPeti:  r(values.biaya_transport_per_peti)|| 0,
+      biayaTransportPerPeti:  jumlahPeti > 0 ? (r(values.biaya_transport_borongan) || 0) / jumlahPeti : 0,
       totalBiayaReguSortir:   r(values.total_biaya_regu_sortir) || 0,
       nilaiRecoveryAfkir:     r(values.nilai_recovery_afkir)    || 0,
       beratPetiMusim:         r(values.berat_tara_kemasan)      || 0,
@@ -257,15 +257,21 @@ export default function KalkulatorPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Biaya Transport per {satuanLabel} (Rp)</Label>
+                  <Label className="text-xs">Biaya Angkut / Transport Borongan (Rp)</Label>
                   <Input
                     type="number"
                     min="0"
-                    step="500"
+                    step="1000"
                     placeholder="0"
-                    value={values.biaya_transport_per_peti}
-                    onChange={(e) => handleChange('biaya_transport_per_peti', e.target.value)}
+                    value={values.biaya_transport_borongan}
+                    onChange={(e) => handleChange('biaya_transport_borongan', e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">Total 1 trip: BBM + sopir + retribusi jalan</p>
+                  {parseFloat(values.biaya_transport_borongan) > 0 && parseFloat(values.jumlah_peti) > 0 && (
+                    <p className="text-xs text-primary font-medium">
+                      = {formatRupiahFull((parseFloat(values.biaya_transport_borongan) || 0) / (parseFloat(values.jumlah_peti) || 1))} / {satuanLabel}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Total Biaya Regu Sortir (Rp)</Label>
@@ -430,7 +436,7 @@ export default function KalkulatorPage() {
 
                   {/* Simulasi Harga Jual */}
                   {result.isValid && result.netYield > 0 && result.hppPerKg > 0 && (
-                    <SimulasiHarga hppPerKg={result.hppPerKg} hppPerPcs={result.hppPerPcs} />
+                    <SimulasiHarga hppPerKg={result.hppPerKg} jumlahPcsPerKg={result.jumlahPcsPerKg} />
                   )}
 
                   {/* Badge musim */}
@@ -455,57 +461,197 @@ export default function KalkulatorPage() {
 }
 
 // ============================================================
-// KOMPONEN SIMULASI HARGA JUAL
+// KOMPONEN SIMULASI HARGA JUAL + ANALISA PASAR
 // ============================================================
-function SimulasiHarga({ hppPerKg, hppPerPcs }: { hppPerKg: number; hppPerPcs: number | null }) {
+function SimulasiHarga({
+  hppPerKg,
+  jumlahPcsPerKg,
+}: {
+  hppPerKg: number
+  jumlahPcsPerKg: number | null
+}) {
   const [marginDapur, setMarginDapur] = useState('2000')
   const [marginSupplier, setMarginSupplier] = useState('1500')
+  const [hargaT1, setHargaT1] = useState('')
+  const [hargaT2, setHargaT2] = useState('')
+  const [hargaT3, setHargaT3] = useState('')
+  const [hargaRetail, setHargaRetail] = useState('')
+  const [showMarket, setShowMarket] = useState(false)
 
   const hargaDapur    = hppPerKg + (parseFloat(marginDapur)    || 0)
   const hargaSupplier = hppPerKg + (parseFloat(marginSupplier) || 0)
 
+  // Per-pcs equivalents (only when pcs conversion data is available)
+  const dapurPerPcs    = jumlahPcsPerKg ? hargaDapur    / jumlahPcsPerKg : null
+  const supplierPerPcs = jumlahPcsPerKg ? hargaSupplier / jumlahPcsPerKg : null
+
+  const tierRows = [
+    { id: 'T1', label: 'T1 / Petani–Suplier', price: parseFloat(hargaT1)     || null },
+    { id: 'T2', label: 'T2 / Agen Tengah',    price: parseFloat(hargaT2)     || null },
+    { id: 'T3', label: 'T3 / Pengecer',       price: parseFloat(hargaT3)     || null },
+    { id: 'RT', label: 'Retail Pasar',         price: parseFloat(hargaRetail) || null },
+  ]
+  const hasMarketData = tierRows.some(t => t.price !== null)
+
   return (
-    <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Simulasi Harga Jual (per kg)
-      </p>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">Margin Dapur (Rp/kg)</Label>
-          <Input
-            type="number"
-            className="h-7 text-xs"
-            value={marginDapur}
-            onChange={(e) => setMarginDapur(e.target.value)}
-          />
-          <p className="text-xs font-medium text-center">{formatRupiahFull(hargaDapur)}/kg</p>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Margin Suplier (Rp/kg)</Label>
-          <Input
-            type="number"
-            className="h-7 text-xs"
-            value={marginSupplier}
-            onChange={(e) => setMarginSupplier(e.target.value)}
-          />
-          <p className="text-xs font-medium text-center">{formatRupiahFull(hargaSupplier)}/kg</p>
-        </div>
-      </div>
-      {hppPerPcs !== null && (
-        <div className="border-t pt-2 space-y-1 text-xs">
-          <p className="text-muted-foreground font-medium">Ekuivalensi per Pcs:</p>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Harga Jual Dapur/pcs</span>
-            <span>{formatRupiahFull(hppPerPcs + (parseFloat(marginDapur) || 0) / 1000 * (1000 / (hppPerKg > 0 ? hppPerKg : 1)) * hppPerPcs / hppPerPcs)}</span>
+    <div className="space-y-2">
+      {/* ─── Simulasi Harga Jual Kita ─── */}
+      <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Simulasi Harga Jual (per kg)
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Margin Dapur (Rp/kg)</Label>
+            <Input
+              type="number"
+              className="h-7 text-xs"
+              value={marginDapur}
+              onChange={(e) => setMarginDapur(e.target.value)}
+            />
+            <p className="text-xs font-semibold text-center">{formatRupiahFull(hargaDapur)}/kg</p>
+            {dapurPerPcs !== null && (
+              <p className="text-xs text-center text-muted-foreground">≈ {formatRupiahFull(dapurPerPcs)}/pcs</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Margin Suplier (Rp/kg)</Label>
+            <Input
+              type="number"
+              className="h-7 text-xs"
+              value={marginSupplier}
+              onChange={(e) => setMarginSupplier(e.target.value)}
+            />
+            <p className="text-xs font-semibold text-center">{formatRupiahFull(hargaSupplier)}/kg</p>
+            {supplierPerPcs !== null && (
+              <p className="text-xs text-center text-muted-foreground">≈ {formatRupiahFull(supplierPerPcs)}/pcs</p>
+            )}
           </div>
         </div>
-      )}
-      {hargaSupplier > hargaDapur && (
-        <p className="text-xs text-yellow-600 flex items-center gap-1">
-          <AlertTriangle className="h-3 w-3" />
-          Harga suplier melebihi harga dapur (tidak logis)
-        </p>
-      )}
+        {hargaSupplier > hargaDapur && (
+          <p className="text-xs text-yellow-600 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            Harga suplier melebihi harga dapur
+          </p>
+        )}
+      </div>
+
+      {/* ─── Analisa Posisi Harga Pasar ─── */}
+      <div className="rounded-lg border bg-sky-50/60 p-3 space-y-3">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-sky-700 hover:text-sky-800"
+          onClick={() => setShowMarket(v => !v)}
+        >
+          <span>Analisa Posisi Harga Pasar</span>
+          {showMarket
+            ? <ChevronUp className="h-3.5 w-3.5" />
+            : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+
+        {showMarket && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Masukkan referensi harga jual tiap tier rantai pasok. Dibandingkan dengan HPP kita
+              untuk melihat ruang margin dan posisi ideal penetapan harga.
+            </p>
+
+            {/* Input harga tiap tier */}
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { label: 'Harga T1 / Petani–Suplier', val: hargaT1,     set: setHargaT1 },
+                { label: 'Harga T2 / Agen Tengah',    val: hargaT2,     set: setHargaT2 },
+                { label: 'Harga T3 / Pengecer',       val: hargaT3,     set: setHargaT3 },
+                { label: 'Harga Retail Pasar',         val: hargaRetail, set: setHargaRetail },
+              ] as const).map(({ label, val, set }) => (
+                <div key={label} className="space-y-1">
+                  <Label className="text-xs leading-tight">{label} (Rp/kg)</Label>
+                  <Input
+                    type="number"
+                    className="h-7 text-xs"
+                    placeholder="0"
+                    min="0"
+                    step="500"
+                    value={val}
+                    onChange={(e) => set(e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Tabel perbandingan — tampil setelah ada data */}
+            {hasMarketData && (
+              <>
+                <Separator />
+                <div className="space-y-1 text-xs">
+                  {/* Header */}
+                  <div className="grid grid-cols-3 gap-1 text-muted-foreground font-medium border-b pb-1">
+                    <span>Tier</span>
+                    <span className="text-right">Harga/kg</span>
+                    <span className="text-right">vs HPP Kita</span>
+                  </div>
+
+                  {/* HPP baseline */}
+                  <div className="grid grid-cols-3 gap-1 py-0.5">
+                    <span className="font-semibold text-orange-600">HPP Kita</span>
+                    <span className="text-right font-semibold">{formatRupiahFull(hppPerKg)}</span>
+                    <span className="text-right text-muted-foreground italic">baseline</span>
+                  </div>
+
+                  {/* Tier rows */}
+                  {tierRows.map(({ id, label, price }) => {
+                    if (price === null) return null
+                    const gap = price - hppPerKg
+                    const pct = hppPerKg > 0 ? (gap / hppPerKg) * 100 : 0
+                    const color = gap < 0
+                      ? 'text-red-600'
+                      : pct < 5
+                        ? 'text-yellow-600'
+                        : 'text-green-600'
+                    return (
+                      <div key={id} className="grid grid-cols-3 gap-1 py-0.5">
+                        <span className="text-muted-foreground truncate">{label}</span>
+                        <span className="text-right">{formatRupiahFull(price)}</span>
+                        <span className={cn('text-right font-medium', color)}>
+                          {gap >= 0 ? '+' : ''}{formatRupiahFull(gap)}{' '}
+                          <span className="opacity-75">({pct >= 0 ? '+' : ''}{pct.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                    )
+                  })}
+
+                  {/* Harga jual kita sebagai pembanding */}
+                  <Separator />
+                  {[
+                    { label: 'Jual Dapur (kita)',   price: hargaDapur },
+                    { label: 'Jual Suplier (kita)', price: hargaSupplier },
+                  ].map(({ label, price }) => {
+                    const gap = price - hppPerKg
+                    const pct = hppPerKg > 0 ? (gap / hppPerKg) * 100 : 0
+                    return (
+                      <div key={label} className="grid grid-cols-3 gap-1 rounded bg-sky-100/80 px-1 py-0.5">
+                        <span className="font-medium text-sky-700 truncate">{label}</span>
+                        <span className="text-right font-semibold text-sky-800">{formatRupiahFull(price)}</span>
+                        <span className="text-right font-medium text-sky-700">
+                          +{formatRupiahFull(gap)}{' '}
+                          <span className="opacity-75">(+{pct.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Catatan warna */}
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground border-t pt-2">
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Margin ≥ 5% — aman</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />Margin &lt; 5% — tipis</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" />Di bawah HPP — rugi</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
