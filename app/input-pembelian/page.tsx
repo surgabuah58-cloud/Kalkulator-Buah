@@ -29,12 +29,12 @@ const pembelianSchema = z.object({
   buah_id:                  z.string().min(1, 'Pilih buah'),
   pemasok_id:               z.string().min(1, 'Pilih pemasok'),
   tanggal:                  z.string().min(1, 'Tanggal wajib diisi'),
-  jumlah_peti:              z.coerce.number().min(1, 'Min. 1 peti'),
-  harga_beli_per_peti:      z.coerce.number().min(0),
-  berat_bruto_total:        z.coerce.number().min(0.1, 'Berat harus > 0'),
-  biaya_transport_per_peti: z.coerce.number().min(0),
-  total_biaya_regu_sortir:  z.coerce.number().min(0),
-  nilai_recovery_afkir:     z.coerce.number().min(0),
+  jumlah_peti:              z.number().min(1, 'Min. 1 peti'),
+  harga_beli_per_peti:      z.number().min(0),
+  berat_bruto_total:        z.number().min(0.1, 'Berat harus > 0'),
+  biaya_transport_per_peti: z.number().min(0),
+  total_biaya_regu_sortir:  z.number().min(0),
+  nilai_recovery_afkir:     z.number().min(0),
   catatan:                  z.string().optional(),
 })
 type PembelianFormValues = z.infer<typeof pembelianSchema>
@@ -53,7 +53,7 @@ export default function InputPembelianPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const form = useForm<PembelianFormValues, unknown, PembelianFormValues>({
+  const form = useForm<PembelianFormValues>({ 
     resolver: zodResolver(pembelianSchema),
     defaultValues: {
       buah_id: '', pemasok_id: '', tanggal: today,
@@ -253,14 +253,14 @@ export default function InputPembelianPage() {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label>Jumlah Peti</Label>
-                    <Input type="number" min="1" step="1" {...form.register('jumlah_peti')} />
+                    <Input type="number" min="1" step="1" {...form.register('jumlah_peti', { valueAsNumber: true })} />
                     {form.formState.errors.jumlah_peti && (
                       <p className="text-xs text-red-500">{form.formState.errors.jumlah_peti.message}</p>
                     )}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Berat Bruto Total (kg)</Label>
-                    <Input type="number" min="0" step="0.5" {...form.register('berat_bruto_total')} />
+                    <Input type="number" min="0" step="0.5" {...form.register('berat_bruto_total', { valueAsNumber: true })} />
                     {form.formState.errors.berat_bruto_total && (
                       <p className="text-xs text-red-500">{form.formState.errors.berat_bruto_total.message}</p>
                     )}
@@ -295,19 +295,19 @@ export default function InputPembelianPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>Harga Beli per Peti (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('harga_beli_per_peti')} />
+                    <Input type="number" min="0" step="1000" {...form.register('harga_beli_per_peti', { valueAsNumber: true })} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Biaya Transport per Peti (Rp)</Label>
-                    <Input type="number" min="0" step="500" {...form.register('biaya_transport_per_peti')} />
+                    <Input type="number" min="0" step="500" {...form.register('biaya_transport_per_peti', { valueAsNumber: true })} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Total Biaya Regu Sortir (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('total_biaya_regu_sortir')} />
+                    <Input type="number" min="0" step="1000" {...form.register('total_biaya_regu_sortir', { valueAsNumber: true })} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Nilai Recovery Buah Afkir (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('nilai_recovery_afkir')} />
+                    <Input type="number" min="0" step="1000" {...form.register('nilai_recovery_afkir', { valueAsNumber: true })} />
                     <p className="text-xs text-muted-foreground">Pendapatan dari jual buah afkir/rusak</p>
                   </div>
                 </div>
