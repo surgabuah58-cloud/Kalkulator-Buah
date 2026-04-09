@@ -471,18 +471,47 @@ function SimulasiHarga({
   hppPerKg: number
   jumlahPcsPerKg: number | null
 }) {
-  const [marginDapur, setMarginDapur] = useState('2000')
-  const [marginSupplier, setMarginSupplier] = useState('1500')
+  // Mode input per kolom: 'margin' = isi margin → tampil harga jual; 'harga' = isi harga jual → tampil margin
+  const [modeDapur,    setModeDapur]    = useState<'margin' | 'harga'>('margin')
+  const [modeSupplier, setModeSupplier] = useState<'margin' | 'harga'>('margin')
+
+  const [marginDapur,       setMarginDapur]       = useState('2000')
+  const [hargaJualDapur,    setHargaJualDapur]    = useState('')
+  const [marginSupplier,    setMarginSupplier]    = useState('1500')
+  const [hargaJualSupplier, setHargaJualSupplier] = useState('')
+
   const [hargaT1, setHargaT1] = useState('')
   const [hargaT2, setHargaT2] = useState('')
   const [hargaT3, setHargaT3] = useState('')
   const [hargaRetail, setHargaRetail] = useState('')
   const [showMarket, setShowMarket] = useState(false)
 
-  const hargaDapur    = hppPerKg + (parseFloat(marginDapur)    || 0)
-  const hargaSupplier = hppPerKg + (parseFloat(marginSupplier) || 0)
+  // Nilai final — selalu konsisten antara dua mode
+  const hargaDapur: number = modeDapur === 'margin'
+    ? hppPerKg + (parseFloat(marginDapur) || 0)
+    : (parseFloat(hargaJualDapur) || hppPerKg)
+  const marginDapurComputed = hargaDapur - hppPerKg
 
-  // Per-pcs equivalents (only when pcs conversion data is available)
+  const hargaSupplier: number = modeSupplier === 'margin'
+    ? hppPerKg + (parseFloat(marginSupplier) || 0)
+    : (parseFloat(hargaJualSupplier) || hppPerKg)
+  const marginSupplierComputed = hargaSupplier - hppPerKg
+
+  // Saat ganti mode, salin nilai yang sudah dihitung ke field baru
+  function switchModeDapur(next: 'margin' | 'harga') {
+    if (next === modeDapur) return
+    if (next === 'harga') setHargaJualDapur(String(Math.round(hargaDapur)))
+    else                  setMarginDapur(String(Math.round(marginDapurComputed)))
+    setModeDapur(next)
+  }
+  function switchModeSupplier(next: 'margin' | 'harga') {
+    if (next === modeSupplier) return
+    if (next === 'harga') setHargaJualSupplier(String(Math.round(hargaSupplier)))
+    else                  setMarginSupplier(String(Math.round(marginSupplierComputed)))
+    setModeSupplier(next)
+  }
+
+  // Per-pcs equivalents
   const dapurPerPcs    = jumlahPcsPerKg ? hargaDapur    / jumlahPcsPerKg : null
   const supplierPerPcs = jumlahPcsPerKg ? hargaSupplier / jumlahPcsPerKg : null
 
@@ -502,28 +531,68 @@ function SimulasiHarga({
           Simulasi Harga Jual (per kg)
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Margin Dapur (Rp/kg)</Label>
-            <Input
-              type="number"
-              className="h-7 text-xs"
-              value={marginDapur}
-              onChange={(e) => setMarginDapur(e.target.value)}
-            />
-            <p className="text-xs font-semibold text-center">{formatRupiahFull(hargaDapur)}/kg</p>
+
+          {/* ── Kolom Dapur ── */}
+          <div className="space-y-1.5">
+            {/* Toggle mode */}
+            <div className="flex rounded-md border overflow-hidden text-[10px]">
+              <button type="button"
+                className={cn('flex-1 py-0.5 transition-colors', modeDapur === 'margin'
+                  ? 'bg-primary text-primary-foreground font-semibold'
+                  : 'bg-background text-muted-foreground hover:bg-muted')}
+                onClick={() => switchModeDapur('margin')}>Margin</button>
+              <button type="button"
+                className={cn('flex-1 py-0.5 transition-colors', modeDapur === 'harga'
+                  ? 'bg-primary text-primary-foreground font-semibold'
+                  : 'bg-background text-muted-foreground hover:bg-muted')}
+                onClick={() => switchModeDapur('harga')}>Harga Jual</button>
+            </div>
+            <Label className="text-xs">
+              {modeDapur === 'margin' ? 'Margin Dapur (Rp/kg)' : 'Harga Jual Dapur (Rp/kg)'}
+            </Label>
+            {modeDapur === 'margin'
+              ? <Input type="number" className="h-7 text-xs" value={marginDapur} onChange={e => setMarginDapur(e.target.value)} />
+              : <Input type="number" className="h-7 text-xs" value={hargaJualDapur} placeholder={String(Math.round(hargaDapur))} onChange={e => setHargaJualDapur(e.target.value)} />
+            }
+            {/* Nilai terkomputasi */}
+            {modeDapur === 'margin'
+              ? <p className="text-xs font-semibold text-center">{formatRupiahFull(hargaDapur)}/kg</p>
+              : <p className={cn('text-xs font-semibold text-center', marginDapurComputed < 0 ? 'text-red-600' : 'text-green-700')}>
+                  Margin: {marginDapurComputed >= 0 ? '+' : ''}{formatRupiahFull(marginDapurComputed)}/kg
+                </p>
+            }
             {dapurPerPcs !== null && (
               <p className="text-xs text-center text-muted-foreground">≈ {formatRupiahFull(dapurPerPcs)}/pcs</p>
             )}
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Margin Suplier (Rp/kg)</Label>
-            <Input
-              type="number"
-              className="h-7 text-xs"
-              value={marginSupplier}
-              onChange={(e) => setMarginSupplier(e.target.value)}
-            />
-            <p className="text-xs font-semibold text-center">{formatRupiahFull(hargaSupplier)}/kg</p>
+
+          {/* ── Kolom Suplier ── */}
+          <div className="space-y-1.5">
+            <div className="flex rounded-md border overflow-hidden text-[10px]">
+              <button type="button"
+                className={cn('flex-1 py-0.5 transition-colors', modeSupplier === 'margin'
+                  ? 'bg-primary text-primary-foreground font-semibold'
+                  : 'bg-background text-muted-foreground hover:bg-muted')}
+                onClick={() => switchModeSupplier('margin')}>Margin</button>
+              <button type="button"
+                className={cn('flex-1 py-0.5 transition-colors', modeSupplier === 'harga'
+                  ? 'bg-primary text-primary-foreground font-semibold'
+                  : 'bg-background text-muted-foreground hover:bg-muted')}
+                onClick={() => switchModeSupplier('harga')}>Harga Jual</button>
+            </div>
+            <Label className="text-xs">
+              {modeSupplier === 'margin' ? 'Margin Suplier (Rp/kg)' : 'Harga Jual Suplier (Rp/kg)'}
+            </Label>
+            {modeSupplier === 'margin'
+              ? <Input type="number" className="h-7 text-xs" value={marginSupplier} onChange={e => setMarginSupplier(e.target.value)} />
+              : <Input type="number" className="h-7 text-xs" value={hargaJualSupplier} placeholder={String(Math.round(hargaSupplier))} onChange={e => setHargaJualSupplier(e.target.value)} />
+            }
+            {modeSupplier === 'margin'
+              ? <p className="text-xs font-semibold text-center">{formatRupiahFull(hargaSupplier)}/kg</p>
+              : <p className={cn('text-xs font-semibold text-center', marginSupplierComputed < 0 ? 'text-red-600' : 'text-green-700')}>
+                  Margin: {marginSupplierComputed >= 0 ? '+' : ''}{formatRupiahFull(marginSupplierComputed)}/kg
+                </p>
+            }
             {supplierPerPcs !== null && (
               <p className="text-xs text-center text-muted-foreground">≈ {formatRupiahFull(supplierPerPcs)}/pcs</p>
             )}
