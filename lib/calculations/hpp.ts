@@ -40,14 +40,17 @@ export interface HppInputParams {
   // Dari form input pembelian
   jumlahPeti: number
   hargaBeliPerPeti: number
-  beratBrutoTotal: number          // kg
+  beratBrutoTotal: number          // kg (bisa auto-calc dari beratBrutoPerKemasan × jumlahPeti)
   biayaTransportPerPeti: number
   totalBiayaReguSortir: number
   nilaiRecoveryAfkir: number
 
   // Dari master buah (berdasarkan musim aktif)
-  beratPetiMusim: number           // kg berat peti (kemarau/hujan)
+  beratPetiMusim: number           // kg berat tara kemasan kosong (kemarau/hujan)
   pctAfkirMusim: number            // % afkir (kemarau/hujan)
+
+  // Opsional: konversi pcs
+  beratPerPcsGram?: number         // gram per 1 buah/pcs (opsional)
 }
 
 export interface HppResult {
@@ -55,12 +58,17 @@ export interface HppResult {
   landedCostPerPeti: number        // Rp per peti
   totalLandedCost: number          // Rp total
   beratAfkir: number               // kg
-  beratPetiTotal: number           // kg total berat peti kosong
+  beratPetiTotal: number           // kg total berat kemasan kosong
   netYield: number                 // kg bersih yang bisa dijual
   biayaKuliSortirPerKg: number     // Rp/kg
 
   // FINAL RESULT
   hppPerKg: number                 // Rp/kg — True HPP
+
+  // Konversi PCS (opsional, null jika beratPerPcsGram tidak diisi)
+  jumlahPcsPerKg: number | null    // berapa pcs dalam 1 kg
+  totalPcs: number | null          // total pcs dari net yield
+  hppPerPcs: number | null         // HPP per 1 pcs
 
   // Validasi
   isValid: boolean
@@ -144,11 +152,19 @@ export function calculateHpp(params: HppInputParams): HppResult {
 
   // Validasi tambahan hasil kalkulasi
   if (netYield <= 0) {
-    validationErrors.push('Net Yield ≤ 0: periksa kembali berat bruto, berat peti, dan % afkir')
+    validationErrors.push('Net Yield ≤ 0: periksa kembali berat bruto, berat tara kemasan, dan % afkir')
   }
   if (hppPerKg < 0) {
     validationErrors.push('HPP negatif: nilai recovery afkir melebihi total landed cost')
   }
+
+  // Konversi PCS
+  const beratPerPcsGram = params.beratPerPcsGram && params.beratPerPcsGram > 0 ? params.beratPerPcsGram : null
+  const jumlahPcsPerKg = beratPerPcsGram ? Math.round(1000 / beratPerPcsGram) : null
+  const totalPcs = (jumlahPcsPerKg !== null && netYield > 0) ? Math.floor(netYield * jumlahPcsPerKg) : null
+  const hppPerPcs = (totalPcs !== null && totalPcs > 0 && hppPerKg > 0)
+    ? (hppPerKg * netYield) / totalPcs
+    : null
 
   return {
     landedCostPerPeti,
@@ -158,6 +174,9 @@ export function calculateHpp(params: HppInputParams): HppResult {
     netYield,
     biayaKuliSortirPerKg,
     hppPerKg,
+    jumlahPcsPerKg,
+    totalPcs,
+    hppPerPcs,
     isValid: validationErrors.length === 0,
     validationErrors,
   }

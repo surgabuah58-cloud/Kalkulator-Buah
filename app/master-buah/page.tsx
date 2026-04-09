@@ -36,14 +36,28 @@ import {
 // ============================================================
 // SCHEMA VALIDASI
 // ============================================================
+const SATUAN_OPTIONS = [
+  { value: 'peti',    label: 'Peti' },
+  { value: 'krat',   label: 'Krat' },
+  { value: 'dus',    label: 'Dus' },
+  { value: 'karung', label: 'Karung' },
+  { value: 'lainnya', label: 'Lainnya' },
+]
+
+function getSatuanLabel(satuan: string) {
+  return SATUAN_OPTIONS.find(s => s.value === satuan)?.label ?? satuan
+}
+
 const buahSchema = z.object({
   kode: z.string().max(20).optional(),
   nama: z.string().min(1, 'Nama buah wajib diisi').max(100),
   kategori: z.string().optional(),
+  satuan: z.string().min(1, 'Satuan wajib dipilih'),
   berat_peti_kemarau: z.number().min(0, 'Harus ≥ 0'),
   pct_afkir_kemarau: z.number().min(0).max(100, 'Harus antara 0-100'),
   berat_peti_hujan: z.number().min(0, 'Harus ≥ 0'),
   pct_afkir_hujan: z.number().min(0).max(100, 'Harus antara 0-100'),
+  berat_per_pcs_gram: z.number().min(0.01).nullable().optional(),
   deskripsi: z.string().optional(),
 })
 type BuahFormValues = z.infer<typeof buahSchema>
@@ -66,10 +80,12 @@ export default function MasterBuahPage() {
       kode: '',
       nama: '',
       kategori: '',
+      satuan: 'peti',
       berat_peti_kemarau: 0,
       pct_afkir_kemarau: 0,
       berat_peti_hujan: 0,
       pct_afkir_hujan: 0,
+      berat_per_pcs_gram: null,
       deskripsi: '',
     },
   })
@@ -105,10 +121,12 @@ export default function MasterBuahPage() {
       kode: '',
       nama: '',
       kategori: '',
+      satuan: 'peti',
       berat_peti_kemarau: 0,
       pct_afkir_kemarau: 0,
       berat_peti_hujan: 0,
       pct_afkir_hujan: 0,
+      berat_per_pcs_gram: null,
       deskripsi: '',
     })
     setIsDialogOpen(true)
@@ -120,10 +138,12 @@ export default function MasterBuahPage() {
       kode: buah.kode ?? '',
       nama: buah.nama,
       kategori: buah.kategori ?? '',
+      satuan: buah.satuan ?? 'peti',
       berat_peti_kemarau: buah.berat_peti_kemarau,
       pct_afkir_kemarau: buah.pct_afkir_kemarau,
       berat_peti_hujan: buah.berat_peti_hujan,
       pct_afkir_hujan: buah.pct_afkir_hujan,
+      berat_per_pcs_gram: buah.berat_per_pcs_gram ?? null,
       deskripsi: buah.deskripsi ?? '',
     })
     setIsDialogOpen(true)
@@ -135,10 +155,12 @@ export default function MasterBuahPage() {
       kode: values.kode || null,
       nama: values.nama,
       kategori: values.kategori || null,
+      satuan: values.satuan,
       berat_peti_kemarau: values.berat_peti_kemarau,
       pct_afkir_kemarau: values.pct_afkir_kemarau,
       berat_peti_hujan: values.berat_peti_hujan,
       pct_afkir_hujan: values.pct_afkir_hujan,
+      berat_per_pcs_gram: values.berat_per_pcs_gram ?? null,
       deskripsi: values.deskripsi || null,
     }
 
@@ -211,9 +233,10 @@ export default function MasterBuahPage() {
                 <TableHead className="pl-6">Kode</TableHead>
                 <TableHead>Nama Buah</TableHead>
                 <TableHead>Kategori</TableHead>
+                <TableHead>Satuan</TableHead>
                 <TableHead className="text-center">
                   <span className="flex items-center justify-center gap-1">
-                    <Sun className="h-3 w-3 text-amber-500" /> Berat Peti (Kemarau)
+                    <Sun className="h-3 w-3 text-amber-500" /> Berat Tara Kemarau
                   </span>
                 </TableHead>
                 <TableHead className="text-center">
@@ -223,7 +246,7 @@ export default function MasterBuahPage() {
                 </TableHead>
                 <TableHead className="text-center">
                   <span className="flex items-center justify-center gap-1">
-                    <CloudRain className="h-3 w-3 text-blue-500" /> Berat Peti (Hujan)
+                    <CloudRain className="h-3 w-3 text-blue-500" /> Berat Tara Hujan
                   </span>
                 </TableHead>
                 <TableHead className="text-center">
@@ -231,6 +254,7 @@ export default function MasterBuahPage() {
                     <CloudRain className="h-3 w-3 text-blue-500" /> % Afkir (Hujan)
                   </span>
                 </TableHead>
+                <TableHead className="text-center">Berat/pcs</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right pr-6">Aksi</TableHead>
               </TableRow>
@@ -261,10 +285,18 @@ export default function MasterBuahPage() {
                         <Badge variant="outline" className="text-xs">{buah.kategori}</Badge>
                       ) : <span className="text-muted-foreground text-xs">—</span>}
                     </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">{getSatuanLabel(buah.satuan ?? 'peti')}</Badge>
+                    </TableCell>
                     <TableCell className="text-center">{buah.berat_peti_kemarau} kg</TableCell>
                     <TableCell className="text-center">{buah.pct_afkir_kemarau}%</TableCell>
                     <TableCell className="text-center">{buah.berat_peti_hujan} kg</TableCell>
                     <TableCell className="text-center">{buah.pct_afkir_hujan}%</TableCell>
+                    <TableCell className="text-center">
+                      {buah.berat_per_pcs_gram
+                        ? <span className="text-xs">{buah.berat_per_pcs_gram} g</span>
+                        : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
                     <TableCell className="text-center">
                       <Badge
                         variant={buah.is_active ? 'default' : 'secondary'}
@@ -302,6 +334,7 @@ export default function MasterBuahPage() {
           </DialogHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Baris 1: Kode + Nama */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="kode">Kode Buah <span className="text-muted-foreground">(opsional)</span></Label>
@@ -316,23 +349,42 @@ export default function MasterBuahPage() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="kategori">Kategori</Label>
-              <Select
-                onValueChange={(v) => form.setValue('kategori', v ?? '')}
-                value={form.watch('kategori') || ''}
-              >
-                <SelectTrigger id="kategori">
-                  <SelectValue placeholder="Pilih kategori..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Tropis">Tropis</SelectItem>
-                  <SelectItem value="Import">Import</SelectItem>
-                  <SelectItem value="Lokal">Lokal</SelectItem>
-                  <SelectItem value="Citrus">Citrus</SelectItem>
-                  <SelectItem value="Lainnya">Lainnya</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Baris 2: Kategori + Satuan */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="kategori">Kategori</Label>
+                <Select
+                  onValueChange={(v) => form.setValue('kategori', v ?? '')}
+                  value={form.watch('kategori') || ''}
+                >
+                  <SelectTrigger id="kategori">
+                    <SelectValue placeholder="Pilih kategori..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Tropis">Tropis</SelectItem>
+                    <SelectItem value="Import">Import</SelectItem>
+                    <SelectItem value="Lokal">Lokal</SelectItem>
+                    <SelectItem value="Citrus">Citrus</SelectItem>
+                    <SelectItem value="Lainnya">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="satuan">Satuan Kemasan <span className="text-red-500">*</span></Label>
+                <Select
+                  onValueChange={(v) => form.setValue('satuan', v ?? 'peti')}
+                  value={form.watch('satuan') || 'peti'}
+                >
+                  <SelectTrigger id="satuan">
+                    <SelectValue placeholder="Pilih satuan..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SATUAN_OPTIONS.map(s => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Parameter Kemarau */}
@@ -342,17 +394,21 @@ export default function MasterBuahPage() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="berat_peti_kemarau">Berat Peti (kg)</Label>
+                  <Label htmlFor="berat_peti_kemarau">
+                    Berat Tara {getSatuanLabel(form.watch('satuan') || 'peti')} Kosong (kg)
+                  </Label>
                   <Input
                     id="berat_peti_kemarau"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
+                    placeholder="contoh: 0.5"
                     {...form.register('berat_peti_kemarau', { valueAsNumber: true })}
                   />
+                  <p className="text-xs text-muted-foreground">Berat kemasan kosong saja</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="pct_afkir_kemarau">% Afkir</Label>
+                  <Label htmlFor="pct_afkir_kemarau">% Penyusutan / Afkir</Label>
                   <Input
                     id="pct_afkir_kemarau"
                     type="number"
@@ -372,17 +428,21 @@ export default function MasterBuahPage() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="berat_peti_hujan">Berat Peti (kg)</Label>
+                  <Label htmlFor="berat_peti_hujan">
+                    Berat Tara {getSatuanLabel(form.watch('satuan') || 'peti')} Kosong (kg)
+                  </Label>
                   <Input
                     id="berat_peti_hujan"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
+                    placeholder="contoh: 0.5"
                     {...form.register('berat_peti_hujan', { valueAsNumber: true })}
                   />
+                  <p className="text-xs text-muted-foreground">Berat kemasan kosong saja</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="pct_afkir_hujan">% Afkir</Label>
+                  <Label htmlFor="pct_afkir_hujan">% Penyusutan / Afkir</Label>
                   <Input
                     id="pct_afkir_hujan"
                     type="number"
@@ -393,6 +453,26 @@ export default function MasterBuahPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Konversi PCS */}
+            <div className="space-y-1.5">
+              <Label htmlFor="berat_per_pcs_gram">
+                Berat per Butir/Pcs (gram) <span className="text-muted-foreground">(opsional)</span>
+              </Label>
+              <Input
+                id="berat_per_pcs_gram"
+                type="number"
+                step="0.1"
+                min="0.1"
+                placeholder="contoh: 10 (anggur), 200 (apel)"
+                {...form.register('berat_per_pcs_gram', {
+                  setValueAs: (v) => v === '' || v === null ? null : parseFloat(v),
+                })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Digunakan untuk konversi biji/pcs di kalkulator HPP
+              </p>
             </div>
 
             <div className="space-y-1.5">

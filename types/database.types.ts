@@ -33,6 +33,7 @@ export interface Database {
           pct_afkir_kemarau: number
           berat_peti_hujan: number
           pct_afkir_hujan: number
+          berat_per_pcs_gram: number | null
           deskripsi: string | null
           is_active: boolean
           created_at: string
@@ -48,6 +49,7 @@ export interface Database {
           pct_afkir_kemarau: number
           berat_peti_hujan: number
           pct_afkir_hujan: number
+          berat_per_pcs_gram?: number | null
           deskripsi?: string | null
           is_active?: boolean
           created_at?: string
@@ -63,6 +65,7 @@ export interface Database {
           pct_afkir_kemarau?: number
           berat_peti_hujan?: number
           pct_afkir_hujan?: number
+          berat_per_pcs_gram?: number | null
           deskripsi?: string | null
           is_active?: boolean
           updated_at?: string

@@ -18,16 +18,27 @@ import { cn } from '@/lib/utils'
 // ============================================================
 const DEFAULT_STATE = {
   // Parameter buah (manual input di kalkulator)
-  berat_peti: '',
+  satuan: 'peti',                  // satuan kemasan
+  berat_tara_kemasan: '',          // berat kemasan kosong (kg)
   pct_afkir: '',
-  // Input pembelian
+  berat_per_pcs_gram: '',          // opsional, untuk konversi pcs
+  // Input pembelian fisik
   jumlah_peti: '1',
+  berat_bruto_per_kemasan: '',     // berat bruto 1 kemasan (kg)
+  // Biaya
   harga_beli_per_peti: '',
-  berat_bruto_total: '',
   biaya_transport_per_peti: '',
   total_biaya_regu_sortir: '',
   nilai_recovery_afkir: '',
 }
+
+const SATUAN_OPTIONS = [
+  { value: 'peti',    label: 'Peti' },
+  { value: 'krat',   label: 'Krat' },
+  { value: 'dus',    label: 'Dus' },
+  { value: 'karung', label: 'Karung' },
+  { value: 'lainnya', label: 'Lainnya' },
+]
 
 export default function KalkulatorPage() {
   const { musim, isKemarau } = useSeason()
@@ -41,30 +52,46 @@ export default function KalkulatorPage() {
     setValues(DEFAULT_STATE)
   }
 
+  const satuanLabel = SATUAN_OPTIONS.find(s => s.value === values.satuan)?.label ?? 'Peti'
+
   // ============================================================
   // LIVE KALKULASI
   // ============================================================
   const result = useMemo(() => {
     const r = parseFloat
+    const jumlahPeti         = r(values.jumlah_peti)              || 0
+    const beratBrutoPer      = r(values.berat_bruto_per_kemasan)  || 0
+    // Auto-hitung berat bruto total
+    const beratBrutoTotal    = beratBrutoPer > 0 && jumlahPeti > 0
+      ? beratBrutoPer * jumlahPeti
+      : 0
+
     const params = {
-      jumlahPeti:             r(values.jumlah_peti)             || 0,
+      jumlahPeti,
       hargaBeliPerPeti:       r(values.harga_beli_per_peti)     || 0,
-      beratBrutoTotal:        r(values.berat_bruto_total)       || 0,
+      beratBrutoTotal,
       biayaTransportPerPeti:  r(values.biaya_transport_per_peti)|| 0,
       totalBiayaReguSortir:   r(values.total_biaya_regu_sortir) || 0,
       nilaiRecoveryAfkir:     r(values.nilai_recovery_afkir)    || 0,
-      beratPetiMusim:         r(values.berat_peti)              || 0,
+      beratPetiMusim:         r(values.berat_tara_kemasan)      || 0,
       pctAfkirMusim:          r(values.pct_afkir)               || 0,
+      beratPerPcsGram:        r(values.berat_per_pcs_gram)      || undefined,
     }
 
-    // Jangan hitung kalau semua masih 0
-    const hasInput = params.hargaBeliPerPeti > 0 || params.beratBrutoTotal > 0
+    const hasInput = params.hargaBeliPerPeti > 0 || beratBrutoTotal > 0
     if (!hasInput) return null
 
     return calculateHpp(params)
   }, [values])
 
-  const hasAnyInput = Object.values(values).some(v => v !== '' && v !== '1' && v !== '0')
+  // Derived display value
+  const beratBrutoTotalDisplay = useMemo(() => {
+    const j = parseFloat(values.jumlah_peti) || 0
+    const b = parseFloat(values.berat_bruto_per_kemasan) || 0
+    return j > 0 && b > 0 ? (j * b).toFixed(2) : null
+  }, [values.jumlah_peti, values.berat_bruto_per_kemasan])
+
+  const hasAnyInput = Object.entries(values).some(([k, v]) => k !== 'jumlah_peti' && k !== 'satuan' && v !== '' && v !== '0')
 
   // ============================================================
   // RENDER
@@ -100,27 +127,41 @@ export default function KalkulatorPage() {
                 Parameter Buah (Musim {isKemarau ? 'Kemarau' : 'Hujan'})
               </CardTitle>
               <CardDescription className="text-xs">
-                Masukkan parameter buah sesuai musim aktif. Nilai ini biasanya diambil dari Master Buah.
+                Masukkan parameter buah sesuai musim aktif. Ambil dari data Master Buah.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {/* Satuan */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Satuan Kemasan</Label>
+                <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={values.satuan}
+                  onChange={(e) => handleChange('satuan', e.target.value)}
+                >
+                  {SATUAN_OPTIONS.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    Berat Peti {isKemarau ? 'Kemarau' : 'Hujan'} (kg)
+                    Berat Tara {satuanLabel} Kosong (kg)
                   </Label>
                   <Input
                     type="number"
                     min="0"
-                    step="0.1"
-                    placeholder="contoh: 5.0"
-                    value={values.berat_peti}
-                    onChange={(e) => handleChange('berat_peti', e.target.value)}
+                    step="0.01"
+                    placeholder="contoh: 0.5"
+                    value={values.berat_tara_kemasan}
+                    onChange={(e) => handleChange('berat_tara_kemasan', e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">Berat kemasan kosong saja</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    % Afkir {isKemarau ? 'Kemarau' : 'Hujan'}
+                    % Penyusutan / Afkir {isKemarau ? 'Kemarau' : 'Hujan'}
                   </Label>
                   <Input
                     type="number"
@@ -133,6 +174,19 @@ export default function KalkulatorPage() {
                   />
                 </div>
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Berat per Butir/Pcs (gram) <span className="text-muted-foreground">— opsional, untuk konversi biji</span>
+                </Label>
+                <Input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  placeholder="contoh: 10 (anggur), 200 (apel)"
+                  value={values.berat_per_pcs_gram}
+                  onChange={(e) => handleChange('berat_per_pcs_gram', e.target.value)}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -144,10 +198,10 @@ export default function KalkulatorPage() {
                 Data Fisik Pembelian
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Jumlah Peti</Label>
+                  <Label className="text-xs">Jumlah {satuanLabel}</Label>
                   <Input
                     type="number"
                     min="1"
@@ -157,17 +211,27 @@ export default function KalkulatorPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Berat Bruto Total (kg)</Label>
+                  <Label className="text-xs">Berat Bruto per {satuanLabel} (kg)</Label>
                   <Input
                     type="number"
                     min="0"
-                    step="0.5"
-                    placeholder="Total berat termasuk peti"
-                    value={values.berat_bruto_total}
-                    onChange={(e) => handleChange('berat_bruto_total', e.target.value)}
+                    step="0.1"
+                    placeholder="contoh: 6.5"
+                    value={values.berat_bruto_per_kemasan}
+                    onChange={(e) => handleChange('berat_bruto_per_kemasan', e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">Berat kotor 1 {satuanLabel} termasuk isi</p>
                 </div>
               </div>
+              {/* Auto-calc total */}
+              {beratBrutoTotalDisplay && (
+                <div className="rounded-md bg-muted/50 border px-3 py-2 flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground text-xs">
+                    Berat Bruto Total ({values.jumlah_peti} × {values.berat_bruto_per_kemasan} kg)
+                  </span>
+                  <span className="font-semibold">{beratBrutoTotalDisplay} kg</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -182,7 +246,7 @@ export default function KalkulatorPage() {
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Harga Beli per Peti (Rp)</Label>
+                  <Label className="text-xs">Harga Beli per {satuanLabel} (Rp)</Label>
                   <Input
                     type="number"
                     min="0"
@@ -193,7 +257,7 @@ export default function KalkulatorPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Biaya Transport per Peti (Rp)</Label>
+                  <Label className="text-xs">Biaya Transport per {satuanLabel} (Rp)</Label>
                   <Input
                     type="number"
                     min="0"
@@ -288,12 +352,12 @@ export default function KalkulatorPage() {
                     <Separator />
 
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Berat Peti Total</span>
+                      <span className="text-muted-foreground">Berat Tara {satuanLabel} Total</span>
                       <span className="text-red-500">- {formatKg(result.beratPetiTotal)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        Berat Afkir ({formatPersen(parseFloat(values.pct_afkir) || 0)})
+                        Penyusutan/Afkir ({formatPersen(parseFloat(values.pct_afkir) || 0)})
                       </span>
                       <span className="text-amber-600">- {formatKg(result.beratAfkir)}</span>
                     </div>
@@ -340,9 +404,33 @@ export default function KalkulatorPage() {
                     )}
                   </div>
 
+                  {/* Konversi PCS */}
+                  {result.jumlahPcsPerKg !== null && result.totalPcs !== null && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2 text-xs">
+                        <p className="font-semibold text-muted-foreground uppercase tracking-wide">Konversi Biji / Pcs</p>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Jumlah Pcs per Kg</span>
+                          <span className="font-medium">~{result.jumlahPcsPerKg} pcs</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total Pcs (estimasi)</span>
+                          <span className="font-semibold text-primary">~{result.totalPcs.toLocaleString('id-ID')} pcs</span>
+                        </div>
+                        {result.hppPerPcs !== null && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">HPP per Pcs</span>
+                            <span className="font-medium">{formatRupiahFull(result.hppPerPcs)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
                   {/* Simulasi Harga Jual */}
                   {result.isValid && result.netYield > 0 && result.hppPerKg > 0 && (
-                    <SimulasiHarga hppPerKg={result.hppPerKg} />
+                    <SimulasiHarga hppPerKg={result.hppPerKg} hppPerPcs={result.hppPerPcs} />
                   )}
 
                   {/* Badge musim */}
@@ -369,7 +457,7 @@ export default function KalkulatorPage() {
 // ============================================================
 // KOMPONEN SIMULASI HARGA JUAL
 // ============================================================
-function SimulasiHarga({ hppPerKg }: { hppPerKg: number }) {
+function SimulasiHarga({ hppPerKg, hppPerPcs }: { hppPerKg: number; hppPerPcs: number | null }) {
   const [marginDapur, setMarginDapur] = useState('2000')
   const [marginSupplier, setMarginSupplier] = useState('1500')
 
@@ -379,7 +467,7 @@ function SimulasiHarga({ hppPerKg }: { hppPerKg: number }) {
   return (
     <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Simulasi Harga Jual
+        Simulasi Harga Jual (per kg)
       </p>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -390,7 +478,7 @@ function SimulasiHarga({ hppPerKg }: { hppPerKg: number }) {
             value={marginDapur}
             onChange={(e) => setMarginDapur(e.target.value)}
           />
-          <p className="text-xs font-medium text-center">{formatRupiahFull(hargaDapur)}</p>
+          <p className="text-xs font-medium text-center">{formatRupiahFull(hargaDapur)}/kg</p>
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Margin Suplier (Rp/kg)</Label>
@@ -400,9 +488,18 @@ function SimulasiHarga({ hppPerKg }: { hppPerKg: number }) {
             value={marginSupplier}
             onChange={(e) => setMarginSupplier(e.target.value)}
           />
-          <p className="text-xs font-medium text-center">{formatRupiahFull(hargaSupplier)}</p>
+          <p className="text-xs font-medium text-center">{formatRupiahFull(hargaSupplier)}/kg</p>
         </div>
       </div>
+      {hppPerPcs !== null && (
+        <div className="border-t pt-2 space-y-1 text-xs">
+          <p className="text-muted-foreground font-medium">Ekuivalensi per Pcs:</p>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Harga Jual Dapur/pcs</span>
+            <span>{formatRupiahFull(hppPerPcs + (parseFloat(marginDapur) || 0) / 1000 * (1000 / (hppPerKg > 0 ? hppPerKg : 1)) * hppPerPcs / hppPerPcs)}</span>
+          </div>
+        </div>
+      )}
       {hargaSupplier > hargaDapur && (
         <p className="text-xs text-yellow-600 flex items-center gap-1">
           <AlertTriangle className="h-3 w-3" />
