@@ -206,7 +206,7 @@ export default function InputPembelianPage() {
                 <div className="space-y-1.5">
                   <Label>Buah <span className="text-red-500">*</span></Label>
                   <Select
-                    onValueChange={(v) => form.setValue('buah_id', v, { shouldValidate: true })}
+                    onValueChange={(v) => form.setValue('buah_id', v ?? '', { shouldValidate: true })}
                     value={form.watch('buah_id')}
                   >
                     <SelectTrigger>
@@ -225,7 +225,7 @@ export default function InputPembelianPage() {
                 <div className="space-y-1.5">
                   <Label>Pemasok <span className="text-red-500">*</span></Label>
                   <Select
-                    onValueChange={(v) => form.setValue('pemasok_id', v, { shouldValidate: true })}
+                    onValueChange={(v) => form.setValue('pemasok_id', v ?? '', { shouldValidate: true })}
                     value={form.watch('pemasok_id')}
                   >
                     <SelectTrigger>

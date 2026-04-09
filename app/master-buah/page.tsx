@@ -319,7 +319,7 @@ export default function MasterBuahPage() {
             <div className="space-y-1.5">
               <Label htmlFor="kategori">Kategori</Label>
               <Select
-                onValueChange={(v) => form.setValue('kategori', v)}
+                onValueChange={(v) => form.setValue('kategori', v ?? '')}
                 value={form.watch('kategori') || ''}
               >
                 <SelectTrigger id="kategori">

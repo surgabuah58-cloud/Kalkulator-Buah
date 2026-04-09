@@ -290,7 +290,7 @@ export default function MasterPemasokPage() {
             <div className="space-y-1.5">
               <Label>Kategori Pemasok</Label>
               <Select
-                onValueChange={(v) => form.setValue('kategori', v as 'Tangan 1' | 'Tangan 2' | 'Tangan 3')}
+                onValueChange={(v) => form.setValue('kategori', (v ?? '') as 'Tangan 1' | 'Tangan 2' | 'Tangan 3')}
                 value={form.watch('kategori') || ''}
               >
                 <SelectTrigger>
