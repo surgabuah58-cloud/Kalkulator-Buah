@@ -41,6 +41,7 @@ const SATUAN_OPTIONS = [
   { value: 'krat',   label: 'Krat' },
   { value: 'dus',    label: 'Dus' },
   { value: 'karung', label: 'Karung' },
+  { value: 'pcs',    label: 'Pcs / Buah' },
   { value: 'lainnya', label: 'Lainnya' },
 ]
 

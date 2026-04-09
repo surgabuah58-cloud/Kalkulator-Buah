@@ -26,16 +26,16 @@ import { cn } from '@/lib/utils'
 // SCHEMA VALIDASI
 // ============================================================
 const pembelianSchema = z.object({
-  buah_id:                  z.string().min(1, 'Pilih buah'),
-  pemasok_id:               z.string().min(1, 'Pilih pemasok'),
-  tanggal:                  z.string().min(1, 'Tanggal wajib diisi'),
-  jumlah_peti:              z.number().min(1, 'Min. 1 peti'),
-  harga_beli_per_peti:      z.number().min(0),
-  berat_bruto_total:        z.number().min(0.1, 'Berat harus > 0'),
-  biaya_transport_per_peti: z.number().min(0),
-  total_biaya_regu_sortir:  z.number().min(0),
-  nilai_recovery_afkir:     z.number().min(0),
-  catatan:                  z.string().optional(),
+  buah_id:                    z.string().min(1, 'Pilih buah'),
+  pemasok_id:                 z.string().min(1, 'Pilih pemasok'),
+  tanggal:                    z.string().min(1, 'Tanggal wajib diisi'),
+  jumlah_peti:                z.number().min(1, 'Min. 1 kemasan'),
+  harga_beli_per_peti:        z.number().min(0),
+  berat_bruto_per_kemasan:    z.number().min(0.01, 'Berat per kemasan harus > 0'),
+  biaya_transport_borongan:   z.number().min(0),
+  total_biaya_regu_sortir:    z.number().min(0),
+  nilai_recovery_afkir:       z.number().min(0),
+  catatan:                    z.string().optional(),
 })
 type PembelianFormValues = z.infer<typeof pembelianSchema>
 
@@ -62,8 +62,8 @@ export default function InputPembelianPage() {
     resolver: zodResolver(pembelianSchema),
     defaultValues: {
       buah_id: '', pemasok_id: '', tanggal: today,
-      jumlah_peti: 1, harga_beli_per_peti: 0, berat_bruto_total: 0,
-      biaya_transport_per_peti: 0, total_biaya_regu_sortir: 0,
+      jumlah_peti: 1, harga_beli_per_peti: 0, berat_bruto_per_kemasan: 0,
+      biaya_transport_borongan: 0, total_biaya_regu_sortir: 0,
       nilai_recovery_afkir: 0, catatan: '',
     },
   })
@@ -110,12 +110,17 @@ export default function InputPembelianPage() {
       : selectedBuah.pct_afkir_hujan
 
     const params = {
-      jumlahPeti:             Number(watchedValues.jumlah_peti)              || 0,
-      hargaBeliPerPeti:       Number(watchedValues.harga_beli_per_peti)      || 0,
-      beratBrutoTotal:        Number(watchedValues.berat_bruto_total)        || 0,
-      biayaTransportPerPeti:  Number(watchedValues.biaya_transport_per_peti) || 0,
-      totalBiayaReguSortir:   Number(watchedValues.total_biaya_regu_sortir)  || 0,
-      nilaiRecoveryAfkir:     Number(watchedValues.nilai_recovery_afkir)     || 0,
+      jumlahPeti:             Number(watchedValues.jumlah_peti)                  || 0,
+      hargaBeliPerPeti:       Number(watchedValues.harga_beli_per_peti)          || 0,
+      // Auto-hitung berat bruto total dari per kemasan × jumlah
+      beratBrutoTotal:        (Number(watchedValues.berat_bruto_per_kemasan) || 0)
+                              * (Number(watchedValues.jumlah_peti) || 0),
+      // Auto-bagi transport borongan dengan jumlah kemasan
+      biayaTransportPerPeti:  Number(watchedValues.jumlah_peti) > 0
+                                ? (Number(watchedValues.biaya_transport_borongan) || 0) / Number(watchedValues.jumlah_peti)
+                                : 0,
+      totalBiayaReguSortir:   Number(watchedValues.total_biaya_regu_sortir)      || 0,
+      nilaiRecoveryAfkir:     Number(watchedValues.nilai_recovery_afkir)         || 0,
       beratPetiMusim,
       pctAfkirMusim,
     }
@@ -137,15 +142,19 @@ export default function InputPembelianPage() {
     }
 
     setIsSaving(true)
+    const jumlah = values.jumlah_peti
+    const beratBrutoTotal      = values.berat_bruto_per_kemasan * jumlah
+    const biayaTransportPerPeti = jumlah > 0 ? values.biaya_transport_borongan / jumlah : 0
+
     const { error } = await supabase.from('pembelian').insert({
       tanggal:                  values.tanggal,
       buah_id:                  values.buah_id,
       pemasok_id:               values.pemasok_id,
       musim,
-      jumlah_peti:              values.jumlah_peti,
+      jumlah_peti:              jumlah,
       harga_beli_per_peti:      values.harga_beli_per_peti,
-      berat_bruto_total:        values.berat_bruto_total,
-      biaya_transport_per_peti: values.biaya_transport_per_peti,
+      berat_bruto_total:        beratBrutoTotal,
+      biaya_transport_per_peti: biayaTransportPerPeti,
       total_biaya_regu_sortir:  values.total_biaya_regu_sortir,
       nilai_recovery_afkir:     values.nilai_recovery_afkir,
       // Simpan snapshot kalkulasi untuk audit
@@ -166,8 +175,8 @@ export default function InputPembelianPage() {
       form.reset({
         ...form.getValues(),
         buah_id: '', pemasok_id: '',
-        jumlah_peti: 1, harga_beli_per_peti: 0, berat_bruto_total: 0,
-        biaya_transport_per_peti: 0, total_biaya_regu_sortir: 0,
+        jumlah_peti: 1, harga_beli_per_peti: 0, berat_bruto_per_kemasan: 0,
+        biaya_transport_borongan: 0, total_biaya_regu_sortir: 0,
         nilai_recovery_afkir: 0, catatan: '',
       })
     }
@@ -268,10 +277,16 @@ export default function InputPembelianPage() {
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Berat Bruto Total (kg)</Label>
-                    <Input type="number" min="0" step="0.5" {...form.register('berat_bruto_total', { valueAsNumber: true })} />
-                    {form.formState.errors.berat_bruto_total && (
-                      <p className="text-xs text-red-500">{form.formState.errors.berat_bruto_total.message}</p>
+                    <Label>Berat Bruto per {satuanLabel} (kg)</Label>
+                    <Input type="number" min="0" step="0.1" placeholder="contoh: 6.5" {...form.register('berat_bruto_per_kemasan', { valueAsNumber: true })} />
+                    {form.formState.errors.berat_bruto_per_kemasan && (
+                      <p className="text-xs text-red-500">{form.formState.errors.berat_bruto_per_kemasan.message}</p>
+                    )}
+                    {/* Auto-total preview */}
+                    {(form.watch('berat_bruto_per_kemasan') || 0) > 0 && (form.watch('jumlah_peti') || 0) > 0 && (
+                      <p className="text-xs text-primary font-medium">
+                        Total: {((form.watch('berat_bruto_per_kemasan') || 0) * (form.watch('jumlah_peti') || 0)).toFixed(2)} kg
+                      </p>
                     )}
                   </div>
                   <div className="space-y-1.5 col-span-2 sm:col-span-1">
@@ -307,8 +322,16 @@ export default function InputPembelianPage() {
                     <Input type="number" min="0" step="1000" {...form.register('harga_beli_per_peti', { valueAsNumber: true })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Biaya Transport per {satuanLabel} (Rp)</Label>
-                    <Input type="number" min="0" step="500" {...form.register('biaya_transport_per_peti', { valueAsNumber: true })} />
+                    <Label>Biaya Angkut / Transport Borongan (Rp)</Label>
+                    <Input type="number" min="0" step="1000" {...form.register('biaya_transport_borongan', { valueAsNumber: true })} />
+                    <p className="text-xs text-muted-foreground">Total 1 trip: BBM + sopir + retribusi</p>
+                    {(form.watch('biaya_transport_borongan') || 0) > 0 && (form.watch('jumlah_peti') || 0) > 0 && (
+                      <p className="text-xs text-primary font-medium">
+                        = {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(
+                            (form.watch('biaya_transport_borongan') || 0) / (form.watch('jumlah_peti') || 1)
+                          )} / {satuanLabel.toLowerCase()}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Total Biaya Regu Sortir (Rp)</Label>
