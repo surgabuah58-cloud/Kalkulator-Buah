@@ -40,10 +40,10 @@ const buahSchema = z.object({
   kode: z.string().max(20).optional(),
   nama: z.string().min(1, 'Nama buah wajib diisi').max(100),
   kategori: z.string().optional(),
-  berat_peti_kemarau: z.coerce.number().min(0, 'Harus ≥ 0'),
-  pct_afkir_kemarau: z.coerce.number().min(0).max(100, 'Harus antara 0-100'),
-  berat_peti_hujan: z.coerce.number().min(0, 'Harus ≥ 0'),
-  pct_afkir_hujan: z.coerce.number().min(0).max(100, 'Harus antara 0-100'),
+  berat_peti_kemarau: z.number().min(0, 'Harus ≥ 0'),
+  pct_afkir_kemarau: z.number().min(0).max(100, 'Harus antara 0-100'),
+  berat_peti_hujan: z.number().min(0, 'Harus ≥ 0'),
+  pct_afkir_hujan: z.number().min(0).max(100, 'Harus antara 0-100'),
   deskripsi: z.string().optional(),
 })
 type BuahFormValues = z.infer<typeof buahSchema>
@@ -348,7 +348,7 @@ export default function MasterBuahPage() {
                     type="number"
                     step="0.1"
                     min="0"
-                    {...form.register('berat_peti_kemarau')}
+                    {...form.register('berat_peti_kemarau', { valueAsNumber: true })}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -359,7 +359,7 @@ export default function MasterBuahPage() {
                     step="0.1"
                     min="0"
                     max="100"
-                    {...form.register('pct_afkir_kemarau')}
+                    {...form.register('pct_afkir_kemarau', { valueAsNumber: true })}
                   />
                 </div>
               </div>
@@ -378,7 +378,7 @@ export default function MasterBuahPage() {
                     type="number"
                     step="0.1"
                     min="0"
-                    {...form.register('berat_peti_hujan')}
+                    {...form.register('berat_peti_hujan', { valueAsNumber: true })}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -389,7 +389,7 @@ export default function MasterBuahPage() {
                     step="0.1"
                     min="0"
                     max="100"
-                    {...form.register('pct_afkir_hujan')}
+                    {...form.register('pct_afkir_hujan', { valueAsNumber: true })}
                   />
                 </div>
               </div>
