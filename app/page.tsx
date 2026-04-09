@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Apple, Users, ShoppingCart, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export default function DashboardPage() {
   return (
@@ -127,12 +128,8 @@ export default function DashboardPage() {
             Tambahkan data buah dan pemasok terlebih dahulu, lalu mulai input pembelian harian Anda.
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/master-buah">Tambah Buah</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/master-pemasok">Tambah Pemasok</Link>
-            </Button>
+            <Link href="/master-buah" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>Tambah Buah</Link>
+            <Link href="/master-pemasok" className={cn(buttonVariants({ size: 'sm' }))}>Tambah Pemasok</Link>
           </div>
         </CardContent>
       </Card>
