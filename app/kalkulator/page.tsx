@@ -25,9 +25,11 @@ const DEFAULT_STATE = {
   // Input pembelian fisik
   jumlah_peti: '1',
   berat_bruto_per_kemasan: '',     // berat bruto 1 kemasan (kg)
-  // Biaya
+  // Biaya — mode harga beli
+  mode_harga_beli: 'per_kemasan',  // 'per_kemasan' | 'per_kg_netto'
   harga_beli_per_peti: '',
-  biaya_transport_borongan: '',  // total biaya angkut 1 trip (BBM + sopir + retribusi)
+  harga_beli_per_kg_netto: '',     // alternatif: harga beli berdasar berat netto (kg)
+  biaya_transport_borongan: '',    // total biaya angkut 1 trip (BBM + sopir + retribusi)
   total_biaya_regu_sortir: '',
   nilai_recovery_afkir: '',
 }
@@ -67,9 +69,21 @@ export default function KalkulatorPage() {
       ? beratBrutoPer * jumlahPeti
       : 0
 
+    // Hitung hargaBeliPerPeti berdasarkan mode
+    let hargaBeliPerPeti: number
+    if (values.mode_harga_beli === 'per_kg_netto') {
+      const hargaPerKgNetto  = r(values.harga_beli_per_kg_netto) || 0
+      const beratTaraTotal   = (r(values.berat_tara_kemasan) || 0) * jumlahPeti
+      const beratNettoTotal  = Math.max(0, beratBrutoTotal - beratTaraTotal)
+      const totalBiayaBuah   = hargaPerKgNetto * beratNettoTotal
+      hargaBeliPerPeti       = jumlahPeti > 0 ? totalBiayaBuah / jumlahPeti : 0
+    } else {
+      hargaBeliPerPeti       = r(values.harga_beli_per_peti) || 0
+    }
+
     const params = {
       jumlahPeti,
-      hargaBeliPerPeti:       r(values.harga_beli_per_peti)     || 0,
+      hargaBeliPerPeti,
       beratBrutoTotal,
       biayaTransportPerPeti:  jumlahPeti > 0 ? (r(values.biaya_transport_borongan) || 0) / jumlahPeti : 0,
       totalBiayaReguSortir:   r(values.total_biaya_regu_sortir) || 0,
@@ -79,7 +93,7 @@ export default function KalkulatorPage() {
       beratPerPcsGram:        r(values.berat_per_pcs_gram)      || undefined,
     }
 
-    const hasInput = params.hargaBeliPerPeti > 0 || beratBrutoTotal > 0
+    const hasInput = hargaBeliPerPeti > 0 || beratBrutoTotal > 0
     if (!hasInput) return null
 
     return calculateHpp(params)
@@ -92,7 +106,7 @@ export default function KalkulatorPage() {
     return j > 0 && b > 0 ? (j * b).toFixed(2) : null
   }, [values.jumlah_peti, values.berat_bruto_per_kemasan])
 
-  const hasAnyInput = Object.entries(values).some(([k, v]) => k !== 'jumlah_peti' && k !== 'satuan' && v !== '' && v !== '0')
+  const hasAnyInput = Object.entries(values).some(([k, v]) => k !== 'jumlah_peti' && k !== 'satuan' && k !== 'mode_harga_beli' && v !== '' && v !== '0')
 
   // ============================================================
   // RENDER
@@ -244,17 +258,94 @@ export default function KalkulatorPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="space-y-4">
+              {/* ── Toggle mode harga beli ── */}
+              <div className="space-y-2">
+                <Label className="text-xs">Mode Harga Beli</Label>
+                <div className="flex rounded-md border overflow-hidden text-xs w-fit">
+                  <button
+                    type="button"
+                    className={cn(
+                      'px-3 py-1.5 transition-colors',
+                      values.mode_harga_beli === 'per_kemasan'
+                        ? 'bg-primary text-primary-foreground font-semibold'
+                        : 'bg-background text-muted-foreground hover:bg-muted'
+                    )}
+                    onClick={() => handleChange('mode_harga_beli', 'per_kemasan')}
+                  >
+                    Per {satuanLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      'px-3 py-1.5 transition-colors',
+                      values.mode_harga_beli === 'per_kg_netto'
+                        ? 'bg-primary text-primary-foreground font-semibold'
+                        : 'bg-background text-muted-foreground hover:bg-muted'
+                    )}
+                    onClick={() => handleChange('mode_harga_beli', 'per_kg_netto')}
+                  >
+                    Per Kg Netto
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {values.mode_harga_beli === 'per_kemasan'
+                    ? `Harga ditentukan per ${satuanLabel} (paling umum)`
+                    : 'Harga ditentukan per kg bersih — pemasok timbang netto (jeruk, buah naga, dll)'}
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-4">
+                {/* ── Input harga beli (conditional) ── */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Harga Beli per {satuanLabel} (Rp)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    placeholder="0"
-                    value={values.harga_beli_per_peti}
-                    onChange={(e) => handleChange('harga_beli_per_peti', e.target.value)}
-                  />
+                  {values.mode_harga_beli === 'per_kemasan' ? (
+                    <>
+                      <Label className="text-xs">Harga Beli per {satuanLabel} (Rp)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        placeholder="0"
+                        value={values.harga_beli_per_peti}
+                        onChange={(e) => handleChange('harga_beli_per_peti', e.target.value)}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Label className="text-xs">Harga Beli per Kg Netto (Rp)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="100"
+                        placeholder="contoh: 8000"
+                        value={values.harga_beli_per_kg_netto}
+                        onChange={(e) => handleChange('harga_beli_per_kg_netto', e.target.value)}
+                      />
+                      {/* Preview ekuivalen per-kemasan */}
+                      {(() => {
+                        const jumlah   = parseFloat(values.jumlah_peti) || 0
+                        const brutoTotal = (parseFloat(values.berat_bruto_per_kemasan) || 0) * jumlah
+                        const taraTotal  = (parseFloat(values.berat_tara_kemasan) || 0) * jumlah
+                        const netto      = Math.max(0, brutoTotal - taraTotal)
+                        const hargaPerKg = parseFloat(values.harga_beli_per_kg_netto) || 0
+                        const totalBiaya = hargaPerKg * netto
+                        const perPeti    = jumlah > 0 ? totalBiaya / jumlah : 0
+                        if (!hargaPerKg || !netto) return null
+                        return (
+                          <div className="rounded-md bg-primary/5 border border-primary/20 px-2.5 py-2 space-y-0.5">
+                            <p className="text-xs text-muted-foreground">
+                              Netto total: <span className="font-medium text-foreground">{netto.toFixed(2)} kg</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Total biaya buah: <span className="font-medium text-foreground">{formatRupiahFull(totalBiaya)}</span>
+                            </p>
+                            <p className="text-xs text-primary font-semibold">
+                              ≈ {formatRupiahFull(perPeti)} per {satuanLabel}
+                            </p>
+                          </div>
+                        )
+                      })()}
+                    </>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Biaya Angkut / Transport Borongan (Rp)</Label>
@@ -295,6 +386,7 @@ export default function KalkulatorPage() {
                     onChange={(e) => handleChange('nilai_recovery_afkir', e.target.value)}
                   />
                 </div>
+              </div>
               </div>
             </CardContent>
           </Card>
