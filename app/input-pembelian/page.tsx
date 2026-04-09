@@ -53,7 +53,7 @@ export default function InputPembelianPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const form = useForm<PembelianFormValues>({
+  const form = useForm<PembelianFormValues, unknown, PembelianFormValues>({
     resolver: zodResolver(pembelianSchema),
     defaultValues: {
       buah_id: '', pemasok_id: '', tanggal: today,
