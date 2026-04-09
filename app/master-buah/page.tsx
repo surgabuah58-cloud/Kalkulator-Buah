@@ -227,7 +227,7 @@ export default function MasterBuahPage() {
             Parameter musiman menentukan kalkulasi HPP. Pastikan nilai sesuai dengan kondisi lapangan.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

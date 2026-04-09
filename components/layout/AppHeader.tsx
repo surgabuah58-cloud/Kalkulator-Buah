@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { SeasonToggle } from './SeasonToggle'
+import { Menu } from 'lucide-react'
 
 const pageTitles: Record<string, { title: string; description: string }> = {
   '/': { title: 'Dashboard', description: 'Ringkasan aktivitas supply chain' },
@@ -12,21 +13,36 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   '/pricing': { title: 'Pricing Matrix', description: 'Penentuan harga jual Dapur & Sub-Suplier' },
 }
 
-export function AppHeader() {
+interface AppHeaderProps {
+  onMenuClick: () => void
+}
+
+export function AppHeader({ onMenuClick }: AppHeaderProps) {
   const pathname = usePathname()
   const page = pageTitles[pathname] ?? { title: 'Surga Buah', description: '' }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
-      {/* Page Title */}
-      <div>
-        <h1 className="text-base font-semibold leading-tight">{page.title}</h1>
-        {page.description && (
-          <p className="text-xs text-muted-foreground">{page.description}</p>
-        )}
+    <header className="flex h-16 items-center justify-between border-b border-border bg-background px-4 md:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        {/* Hamburger — mobile only */}
+        <button
+          type="button"
+          className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted md:hidden"
+          onClick={onMenuClick}
+          aria-label="Buka menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Page title */}
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-semibold leading-tight md:text-base">{page.title}</h1>
+          {page.description && (
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">{page.description}</p>
+          )}
+        </div>
       </div>
 
-      {/* Season Toggle — global control */}
       <SeasonToggle />
     </header>
   )

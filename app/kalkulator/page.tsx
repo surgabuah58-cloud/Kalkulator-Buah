@@ -98,19 +98,18 @@ export default function KalkulatorPage() {
   // RENDER
   // ============================================================
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="max-w-4xl space-y-3">
       {/* Info Banner */}
       <div className={cn(
-        'rounded-lg border px-4 py-3 text-sm flex items-center gap-3',
+        'rounded-lg border px-3 py-2.5 text-xs flex items-start gap-2',
         isKemarau
           ? 'border-amber-200 bg-amber-50 text-amber-800'
           : 'border-blue-200 bg-blue-50 text-blue-800'
       )}>
-        {isKemarau ? <Sun className="h-4 w-4 flex-shrink-0" /> : <CloudRain className="h-4 w-4 flex-shrink-0" />}
+        {isKemarau ? <Sun className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" /> : <CloudRain className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />}
         <span>
-          Kalkulator ini berjalan <strong>tanpa menyimpan data</strong> ke database.
-          Gunakan halaman <strong>Input Pembelian</strong> jika ingin menyimpan transaksi.
-          Musim aktif saat ini: <strong>{isKemarau ? 'Kemarau' : 'Hujan'}</strong> (ubah dari toggle di header).
+          Kalkulator berjalan <strong>tanpa menyimpan data</strong>.
+          Musim aktif: <strong>{isKemarau ? 'Kemarau' : 'Hujan'}</strong> (ubah dari toggle di header).
         </span>
       </div>
 
@@ -311,7 +310,7 @@ export default function KalkulatorPage() {
         {/* === HASIL KALKULASI === */}
         <div className="lg:col-span-2">
           <Card className={cn(
-            'sticky top-6 border-2',
+            'border-2 md:sticky md:top-6',
             !result ? 'border-dashed' :
             result.isValid && result.netYield > 0 ? 'border-green-300' : 'border-red-300'
           )}>
