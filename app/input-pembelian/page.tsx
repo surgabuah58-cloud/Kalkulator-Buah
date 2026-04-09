@@ -51,6 +51,11 @@ export default function InputPembelianPage() {
   const [selectedBuah, setSelectedBuah] = useState<BuahRow | null>(null)
   const [isSaving, setIsSaving]         = useState(false)
 
+  // Satuan label dinamis dari master buah
+  const satuanLabel = selectedBuah?.satuan
+    ? selectedBuah.satuan.charAt(0).toUpperCase() + selectedBuah.satuan.slice(1)
+    : 'Peti'
+
   const today = new Date().toISOString().split('T')[0]
 
   const form = useForm<PembelianFormValues>({ 
@@ -210,7 +215,9 @@ export default function InputPembelianPage() {
                     value={form.watch('buah_id')}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Pilih buah..." />
+                      <SelectValue placeholder="Pilih buah...">
+                        {buahList.find(b => b.id === form.watch('buah_id'))?.nama ?? null}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {buahList.map(b => (
@@ -229,7 +236,9 @@ export default function InputPembelianPage() {
                     value={form.watch('pemasok_id')}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Pilih pemasok..." />
+                      <SelectValue placeholder="Pilih pemasok...">
+                        {pemasokList.find(p => p.id === form.watch('pemasok_id'))?.nama ?? null}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {pemasokList.map(p => (
@@ -252,7 +261,7 @@ export default function InputPembelianPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label>Jumlah Peti</Label>
+                    <Label>Jumlah {satuanLabel}</Label>
                     <Input type="number" min="1" step="1" {...form.register('jumlah_peti', { valueAsNumber: true })} />
                     {form.formState.errors.jumlah_peti && (
                       <p className="text-xs text-red-500">{form.formState.errors.jumlah_peti.message}</p>
@@ -270,7 +279,7 @@ export default function InputPembelianPage() {
                       Parameter Musim Aktif{' '}
                       {selectedBuah && (
                         <span className="font-medium text-foreground">
-                          ({isKemarau ? selectedBuah.berat_peti_kemarau : selectedBuah.berat_peti_hujan} kg/peti,{' '}
+                          ({isKemarau ? selectedBuah.berat_peti_kemarau : selectedBuah.berat_peti_hujan} kg/{satuanLabel.toLowerCase()},{' '}
                           {isKemarau ? selectedBuah.pct_afkir_kemarau : selectedBuah.pct_afkir_hujan}% afkir)
                         </span>
                       )}
@@ -294,11 +303,11 @@ export default function InputPembelianPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Harga Beli per Peti (Rp)</Label>
+                    <Label>Harga Beli per {satuanLabel} (Rp)</Label>
                     <Input type="number" min="0" step="1000" {...form.register('harga_beli_per_peti', { valueAsNumber: true })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Biaya Transport per Peti (Rp)</Label>
+                    <Label>Biaya Transport per {satuanLabel} (Rp)</Label>
                     <Input type="number" min="0" step="500" {...form.register('biaya_transport_per_peti', { valueAsNumber: true })} />
                   </div>
                   <div className="space-y-1.5">
@@ -367,7 +376,7 @@ export default function InputPembelianPage() {
                 {/* Breakdown Kalkulasi */}
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Landed Cost/Peti</span>
+                    <span className="text-muted-foreground">Landed Cost/{satuanLabel}</span>
                     <span className="font-medium">{formatRupiahFull(hppResult.landedCostPerPeti)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -376,7 +385,7 @@ export default function InputPembelianPage() {
                   </div>
                   <Separator />
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Berat Peti Total</span>
+                    <span className="text-muted-foreground">Berat Tara {satuanLabel} Total</span>
                     <span>{formatKg(hppResult.beratPetiTotal)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -429,7 +438,7 @@ export default function InputPembelianPage() {
                   {isKemarau ? <Sun className="h-3 w-3" /> : <CloudRain className="h-3 w-3" />}
                   <span>
                     Menggunakan parameter {isKemarau ? 'Kemarau' : 'Hujan'}:{' '}
-                    {formatKg(isKemarau ? selectedBuah.berat_peti_kemarau : selectedBuah.berat_peti_hujan)}/peti,{' '}
+                    {formatKg(isKemarau ? selectedBuah.berat_peti_kemarau : selectedBuah.berat_peti_hujan)}/{satuanLabel.toLowerCase()},{' '}
                     {formatPersen(isKemarau ? selectedBuah.pct_afkir_kemarau : selectedBuah.pct_afkir_hujan)} afkir
                   </span>
                 </div>
