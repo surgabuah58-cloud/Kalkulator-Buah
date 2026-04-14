@@ -228,7 +228,7 @@ export default function InputPembelianPage() {
                         {buahList.find(b => b.id === form.watch('buah_id'))?.nama ?? null}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger={false}>
                       {buahList.map(b => (
                         <SelectItem key={b.id} value={b.id}>{b.nama}</SelectItem>
                       ))}
@@ -249,7 +249,7 @@ export default function InputPembelianPage() {
                         {pemasokList.find(p => p.id === form.watch('pemasok_id'))?.nama ?? null}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger={false}>
                       {pemasokList.map(p => (
                         <SelectItem key={p.id} value={p.id}>{p.nama}</SelectItem>
                       ))}
