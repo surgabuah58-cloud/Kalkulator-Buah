@@ -153,7 +153,11 @@ CREATE INDEX IF NOT EXISTS idx_hasil_sortir_pembelian_id ON hasil_sortir(pembeli
 CREATE INDEX IF NOT EXISTS idx_hasil_sortir_tanggal      ON hasil_sortir(tanggal_sortir DESC);
 
 ALTER TABLE hasil_sortir ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all_hasil_sortir" ON hasil_sortir FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_hasil_sortir' AND tablename = 'hasil_sortir') THEN
+    CREATE POLICY "allow_all_hasil_sortir" ON hasil_sortir FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 CREATE OR REPLACE TRIGGER trigger_hasil_sortir_updated_at
   BEFORE UPDATE ON hasil_sortir
@@ -175,10 +179,33 @@ CREATE OR REPLACE TRIGGER trigger_hasil_sortir_no_sortir
   BEFORE INSERT ON hasil_sortir
   FOR EACH ROW EXECUTE FUNCTION generate_no_sortir();
 
+-- Tambah kolom baru ke penjualan jika belum ada (idempoten untuk DB yang sudah ada)
+ALTER TABLE penjualan ADD COLUMN IF NOT EXISTS spare_pct   DECIMAL(5,2)  NOT NULL DEFAULT 0
+  CHECK (spare_pct >= 0 AND spare_pct <= 100);
+ALTER TABLE penjualan ADD COLUMN IF NOT EXISTS tipe_jual   VARCHAR(10)   NOT NULL DEFAULT 'normal';
+ALTER TABLE penjualan ADD COLUMN IF NOT EXISTS sortir_id   UUID;
+
+-- Tambah CHECK constraint tipe_jual jika belum ada
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'penjualan_tipe_jual_check'
+  ) THEN
+    ALTER TABLE penjualan ADD CONSTRAINT penjualan_tipe_jual_check
+      CHECK (tipe_jual IN ('normal', 'reject'));
+  END IF;
+END $$;
+
 -- Tambah FK sortir_id ke penjualan setelah hasil_sortir dibuat
-ALTER TABLE penjualan
-  ADD CONSTRAINT fk_penjualan_sortir
-  FOREIGN KEY (sortir_id) REFERENCES hasil_sortir(id) ON DELETE SET NULL;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_penjualan_sortir'
+  ) THEN
+    ALTER TABLE penjualan
+      ADD CONSTRAINT fk_penjualan_sortir
+      FOREIGN KEY (sortir_id) REFERENCES hasil_sortir(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- Retur ke Pemasok
 -- Mencatat pengembalian barang ke pemasok beserta kredit yang diterima
@@ -203,7 +230,11 @@ CREATE INDEX IF NOT EXISTS idx_retur_pemasok_pembelian_id ON retur_pemasok(pembe
 CREATE INDEX IF NOT EXISTS idx_retur_pemasok_tanggal      ON retur_pemasok(tanggal DESC);
 
 ALTER TABLE retur_pemasok ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all_retur_pemasok" ON retur_pemasok FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_retur_pemasok' AND tablename = 'retur_pemasok') THEN
+    CREATE POLICY "allow_all_retur_pemasok" ON retur_pemasok FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 CREATE OR REPLACE TRIGGER trigger_retur_pemasok_updated_at
   BEFORE UPDATE ON retur_pemasok
@@ -227,8 +258,16 @@ CREATE OR REPLACE TRIGGER trigger_retur_pemasok_no_retur
 
 ALTER TABLE pelanggan ENABLE ROW LEVEL SECURITY;
 ALTER TABLE penjualan ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all_pelanggan" ON pelanggan FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "allow_all_penjualan" ON penjualan  FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_pelanggan' AND tablename = 'pelanggan') THEN
+    CREATE POLICY "allow_all_pelanggan" ON pelanggan FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_penjualan' AND tablename = 'penjualan') THEN
+    CREATE POLICY "allow_all_penjualan" ON penjualan FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 CREATE OR REPLACE TRIGGER trigger_pelanggan_updated_at
   BEFORE UPDATE ON pelanggan
@@ -441,17 +480,33 @@ CREATE OR REPLACE TRIGGER trigger_pembelian_no_transaksi
 -- Aktifkan RLS tapi biarkan semua akses untuk saat ini (tanpa auth)
 -- Nanti, saat auth sudah aktif, ubah policy ini
 
-ALTER TABLE buah     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pemasok  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE buah      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pemasok   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pembelian ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pricing  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pricing   ENABLE ROW LEVEL SECURITY;
 
 -- Policy sementara: izinkan semua akses (anon & authenticated)
 -- TODO: Ganti dengan policy berbasis user saat fitur auth diaktifkan
-CREATE POLICY "allow_all_buah"      ON buah      FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "allow_all_pemasok"   ON pemasok   FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "allow_all_pembelian" ON pembelian  FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "allow_all_pricing"   ON pricing   FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_buah' AND tablename = 'buah') THEN
+    CREATE POLICY "allow_all_buah" ON buah FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_pemasok' AND tablename = 'pemasok') THEN
+    CREATE POLICY "allow_all_pemasok" ON pemasok FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_pembelian' AND tablename = 'pembelian') THEN
+    CREATE POLICY "allow_all_pembelian" ON pembelian FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'allow_all_pricing' AND tablename = 'pricing') THEN
+    CREATE POLICY "allow_all_pricing" ON pricing FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 -- ============================================================
 -- DATA SEED (Contoh Data Awal)
