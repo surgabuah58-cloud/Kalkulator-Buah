@@ -29,7 +29,7 @@ const pembelianSchema = z.object({
   buah_id:                    z.string().min(1, 'Pilih buah'),
   pemasok_id:                 z.string().min(1, 'Pilih pemasok'),
   tanggal:                    z.string().min(1, 'Tanggal wajib diisi'),
-  jumlah_peti:                z.number().min(1, 'Min. 1 kemasan'),
+  jumlah_peti:                z.number().min(0.1, 'Min. 0.1 kemasan'),
   harga_beli_per_peti:        z.number().min(0),
   berat_bruto_per_kemasan:    z.number().min(0.01, 'Berat per kemasan harus > 0'),
   biaya_transport_borongan:   z.number().min(0),
@@ -271,7 +271,7 @@ export default function InputPembelianPage() {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
                     <Label>Jumlah {satuanLabel}</Label>
-                    <Input type="number" min="1" step="1" {...form.register('jumlah_peti', { valueAsNumber: true })} />
+                    <Input type="number" min="0.1" step="0.1" {...form.register('jumlah_peti', { valueAsNumber: true })} />
                     {form.formState.errors.jumlah_peti && (
                       <p className="text-xs text-red-500">{form.formState.errors.jumlah_peti.message}</p>
                     )}

@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS pembelian (
   musim                 VARCHAR(10) NOT NULL CHECK (musim IN ('kemarau', 'hujan')),
   
   -- === INPUT DATA ===
-  jumlah_peti           INTEGER NOT NULL DEFAULT 1 CHECK (jumlah_peti > 0),
+  jumlah_peti           DECIMAL(10,2) NOT NULL DEFAULT 1 CHECK (jumlah_peti > 0),
   harga_beli_per_peti   DECIMAL(15,2) NOT NULL CHECK (harga_beli_per_peti >= 0),
   berat_bruto_total     DECIMAL(10,2) NOT NULL CHECK (berat_bruto_total > 0), -- kg total
   biaya_transport_per_peti  DECIMAL(15,2) NOT NULL DEFAULT 0,
