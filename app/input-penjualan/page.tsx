@@ -36,6 +36,7 @@ const penjualanSchema = z.object({
   tanggal:          z.string().min(1, 'Tanggal wajib diisi'),
   jumlah_kg:        z.number().min(0.01, 'Jumlah harus > 0'),
   harga_jual_per_kg: z.number().min(0, 'Harga tidak boleh negatif'),
+  spare_pct:        z.number().min(0).max(100),
   catatan:          z.string().optional(),
 })
 type PenjualanFormValues = z.infer<typeof penjualanSchema>
@@ -58,7 +59,8 @@ export default function InputPenjualanPage() {
     defaultValues: {
       tanggal: today,
       buah_id: '', pelanggan_id: '',
-      jumlah_kg: 0, harga_jual_per_kg: 0, catatan: '',
+      jumlah_kg: 0, harga_jual_per_kg: 0,
+      spare_pct: 0, catatan: '',
     },
   })
 
@@ -93,12 +95,15 @@ export default function InputPenjualanPage() {
     const jumlah    = watchedValues.jumlah_kg        || 0
     const hargaJual = watchedValues.harga_jual_per_kg || 0
     const hpp       = hppMap[watchedValues.buah_id]  ?? null
-    const totalNilai = jumlah * hargaJual
+    const sparePct  = watchedValues.spare_pct        || 0
+    const spareKg   = jumlah * (sparePct / 100)
+    const totalStok = jumlah + spareKg
+    const totalNilai  = jumlah * hargaJual
     const marginPerKg = hpp !== null ? hargaJual - hpp : null
     const totalMargin = hpp !== null ? (hargaJual - hpp) * jumlah : null
     const pctMargin   = hpp !== null && hpp > 0 ? ((hargaJual - hpp) / hpp) * 100 : null
-    return { jumlah, hargaJual, hpp, totalNilai, marginPerKg, totalMargin, pctMargin }
-  }, [watchedValues.jumlah_kg, watchedValues.harga_jual_per_kg, watchedValues.buah_id, hppMap])
+    return { jumlah, hargaJual, hpp, sparePct, spareKg, totalStok, totalNilai, marginPerKg, totalMargin, pctMargin }
+  }, [watchedValues.jumlah_kg, watchedValues.harga_jual_per_kg, watchedValues.spare_pct, watchedValues.buah_id, hppMap])
 
   const hasInput = preview.jumlah > 0 && preview.hargaJual > 0
 
@@ -114,6 +119,7 @@ export default function InputPenjualanPage() {
       jumlah_kg:         values.jumlah_kg,
       harga_jual_per_kg: values.harga_jual_per_kg,
       hpp_snapshot:      hppMap[values.buah_id] ?? null,
+      spare_pct:         values.spare_pct ?? 0,
       catatan:           values.catatan || null,
     })
 
@@ -124,7 +130,8 @@ export default function InputPenjualanPage() {
       form.reset({
         tanggal: today,
         buah_id: '', pelanggan_id: '',
-        jumlah_kg: 0, harga_jual_per_kg: 0, catatan: '',
+        jumlah_kg: 0, harga_jual_per_kg: 0,
+        spare_pct: 0, catatan: '',
       })
     }
     setIsSaving(false)
@@ -239,6 +246,28 @@ export default function InputPenjualanPage() {
                     )}
                   </div>
                 </div>
+                {/* Spare / Buffer */}
+                <div className="space-y-1.5 pt-2">
+                  <Label>
+                    Spare / Buffer{' '}
+                    <span className="text-muted-foreground text-xs">(% stok cadangan untuk antisipasi buah rusak/gagal)</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number" min="0" max="100" step="0.5"
+                      placeholder="0"
+                      className="w-32"
+                      {...form.register('spare_pct', { valueAsNumber: true })}
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                    {preview.sparePct > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        = +{formatKg(preview.spareKg)} cadangan → total stok{' '}
+                        <span className="font-medium text-foreground">{formatKg(preview.totalStok)}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -282,9 +311,21 @@ export default function InputPenjualanPage() {
               <>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Jumlah</span>
+                    <span className="text-muted-foreground">Jumlah Jual</span>
                     <span className="font-medium">{formatKg(preview.jumlah)}</span>
                   </div>
+                  {preview.sparePct > 0 && (
+                    <>
+                      <div className="flex justify-between text-amber-600">
+                        <span>Buffer ({preview.sparePct}%)</span>
+                        <span className="font-medium">+{formatKg(preview.spareKg)}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-dashed border-muted pt-1">
+                        <span className="font-semibold text-muted-foreground">Stok Disiapkan</span>
+                        <span className="font-bold">{formatKg(preview.totalStok)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Harga Jual/kg</span>
                     <span className="font-medium">{formatRupiahFull(preview.hargaJual)}</span>

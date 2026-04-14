@@ -78,6 +78,7 @@ export interface Database {
           harga_jual_per_kg: number
           total_nilai: number
           hpp_snapshot: number | null
+          spare_pct: number | null
           margin_per_kg: number | null
           catatan: string | null
           created_at: string
@@ -92,6 +93,7 @@ export interface Database {
           jumlah_kg: number
           harga_jual_per_kg: number
           hpp_snapshot?: number | null
+          spare_pct?: number | null
           catatan?: string | null
           created_at?: string
           updated_at?: string
@@ -103,6 +105,7 @@ export interface Database {
           jumlah_kg?: number
           harga_jual_per_kg?: number
           hpp_snapshot?: number | null
+          spare_pct?: number | null
           catatan?: string | null
           updated_at?: string
         }

@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS penjualan (
   harga_jual_per_kg     DECIMAL(15,2) NOT NULL CHECK (harga_jual_per_kg >= 0),
   total_nilai           DECIMAL(15,2) GENERATED ALWAYS AS (jumlah_kg * harga_jual_per_kg) STORED,
   hpp_snapshot          DECIMAL(15,2),  -- HPP saat transaksi (dari v_latest_hpp)
+  spare_pct             DECIMAL(5,2)  NOT NULL DEFAULT 0 CHECK (spare_pct >= 0 AND spare_pct <= 100),
   margin_per_kg         DECIMAL(15,2) GENERATED ALWAYS AS (harga_jual_per_kg - COALESCE(hpp_snapshot, 0)) STORED,
   catatan               TEXT,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
