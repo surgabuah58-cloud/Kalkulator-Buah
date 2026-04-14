@@ -14,6 +14,7 @@ export type Json =
 
 export type Musim = 'kemarau' | 'hujan'
 export type StatusHarga = 'normal' | 'merah' | 'kuning'
+export type TipePelanggan = 'sub_supplier' | 'dapur_mbg' | 'retail'
 
 // ============================================================
 // TABLE TYPES
@@ -22,6 +23,91 @@ export type StatusHarga = 'normal' | 'merah' | 'kuning'
 export interface Database {
   public: {
     Tables: {
+      pelanggan: {
+        Row: {
+          id: string
+          kode: string | null
+          nama: string
+          tipe: TipePelanggan
+          kontak_nama: string | null
+          kontak_telepon: string | null
+          alamat: string | null
+          kota: string | null
+          catatan: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          kode?: string | null
+          nama: string
+          tipe: TipePelanggan
+          kontak_nama?: string | null
+          kontak_telepon?: string | null
+          alamat?: string | null
+          kota?: string | null
+          catatan?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          kode?: string | null
+          nama?: string
+          tipe?: TipePelanggan
+          kontak_nama?: string | null
+          kontak_telepon?: string | null
+          alamat?: string | null
+          kota?: string | null
+          catatan?: string | null
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      penjualan: {
+        Row: {
+          id: string
+          no_transaksi: string | null
+          tanggal: string
+          buah_id: string
+          pelanggan_id: string
+          jumlah_kg: number
+          harga_jual_per_kg: number
+          total_nilai: number
+          hpp_snapshot: number | null
+          margin_per_kg: number | null
+          catatan: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          no_transaksi?: string | null
+          tanggal?: string
+          buah_id: string
+          pelanggan_id: string
+          jumlah_kg: number
+          harga_jual_per_kg: number
+          hpp_snapshot?: number | null
+          catatan?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          tanggal?: string
+          buah_id?: string
+          pelanggan_id?: string
+          jumlah_kg?: number
+          harga_jual_per_kg?: number
+          hpp_snapshot?: number | null
+          catatan?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       buah: {
         Row: {
           id: string
@@ -281,6 +367,13 @@ export type PembelianInsert = Database['public']['Tables']['pembelian']['Insert'
 
 export type PricingRow    = Database['public']['Tables']['pricing']['Row']
 export type PricingUpdate = Database['public']['Tables']['pricing']['Update']
+
+export type PelangganRow    = Database['public']['Tables']['pelanggan']['Row']
+export type PelangganInsert = Database['public']['Tables']['pelanggan']['Insert']
+export type PelangganUpdate = Database['public']['Tables']['pelanggan']['Update']
+
+export type PenjualanRow    = Database['public']['Tables']['penjualan']['Row']
+export type PenjualanInsert = Database['public']['Tables']['penjualan']['Insert']
 
 export type LatestHppRow     = Database['public']['Views']['v_latest_hpp']['Row']
 export type PricingMatrixRow = Database['public']['Views']['v_pricing_matrix']['Row']

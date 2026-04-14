@@ -88,6 +88,72 @@ CREATE TABLE IF NOT EXISTS pembelian (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Master Pelanggan (Customer Master Data)
+CREATE TABLE IF NOT EXISTS pelanggan (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  kode            VARCHAR(20) UNIQUE,
+  nama            VARCHAR(100) NOT NULL,
+  tipe            VARCHAR(20) NOT NULL CHECK (tipe IN ('sub_supplier', 'dapur_mbg', 'retail')),
+  kontak_nama     VARCHAR(100),
+  kontak_telepon  VARCHAR(20),
+  alamat          TEXT,
+  kota            VARCHAR(100),
+  catatan         TEXT,
+  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Penjualan (Daily Sales Transactions)
+CREATE TABLE IF NOT EXISTS penjualan (
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  no_transaksi          VARCHAR(50) UNIQUE,
+  tanggal               DATE NOT NULL DEFAULT CURRENT_DATE,
+  buah_id               UUID NOT NULL REFERENCES buah(id) ON DELETE RESTRICT,
+  pelanggan_id          UUID NOT NULL REFERENCES pelanggan(id) ON DELETE RESTRICT,
+  jumlah_kg             DECIMAL(10,2) NOT NULL CHECK (jumlah_kg > 0),
+  harga_jual_per_kg     DECIMAL(15,2) NOT NULL CHECK (harga_jual_per_kg >= 0),
+  total_nilai           DECIMAL(15,2) GENERATED ALWAYS AS (jumlah_kg * harga_jual_per_kg) STORED,
+  hpp_snapshot          DECIMAL(15,2),  -- HPP saat transaksi (dari v_latest_hpp)
+  margin_per_kg         DECIMAL(15,2) GENERATED ALWAYS AS (harga_jual_per_kg - COALESCE(hpp_snapshot, 0)) STORED,
+  catatan               TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_penjualan_buah_id     ON penjualan(buah_id);
+CREATE INDEX IF NOT EXISTS idx_penjualan_pelanggan_id ON penjualan(pelanggan_id);
+CREATE INDEX IF NOT EXISTS idx_penjualan_tanggal      ON penjualan(tanggal DESC);
+
+ALTER TABLE pelanggan ENABLE ROW LEVEL SECURITY;
+ALTER TABLE penjualan ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_pelanggan" ON pelanggan FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_penjualan" ON penjualan  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE TRIGGER trigger_pelanggan_updated_at
+  BEFORE UPDATE ON pelanggan
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE OR REPLACE TRIGGER trigger_penjualan_updated_at
+  BEFORE UPDATE ON penjualan
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE SEQUENCE IF NOT EXISTS jual_sequence START 1;
+CREATE OR REPLACE FUNCTION generate_no_penjualan()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.no_transaksi IS NULL THEN
+    NEW.no_transaksi := 'JUL-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
+                        LPAD(NEXTVAL('jual_sequence')::TEXT, 4, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trigger_penjualan_no_transaksi
+  BEFORE INSERT ON penjualan
+  FOR EACH ROW EXECUTE FUNCTION generate_no_penjualan();
+
 -- ============================================================
 -- TABEL PRICING
 -- ============================================================

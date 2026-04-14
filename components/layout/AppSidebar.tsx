@@ -12,15 +12,19 @@ import {
   ChevronRight,
   Calculator,
   X,
+  Store,
+  TrendingUp,
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/',                label: 'Dashboard',       icon: LayoutDashboard },
-  { href: '/master-buah',     label: 'Master Buah',     icon: Apple },
-  { href: '/master-pemasok',  label: 'Master Pemasok',  icon: Users },
-  { href: '/input-pembelian', label: 'Input Pembelian', icon: ShoppingCart },
-  { href: '/kalkulator',      label: 'Kalkulator HPP',  icon: Calculator },
-  { href: '/pricing',         label: 'Pricing Matrix',  icon: BarChart3 },
+  { href: '/',                  label: 'Dashboard',         icon: LayoutDashboard },
+  { href: '/master-buah',       label: 'Master Buah',       icon: Apple },
+  { href: '/master-pemasok',    label: 'Master Pemasok',    icon: Users },
+  { href: '/master-pelanggan',  label: 'Master Pelanggan',  icon: Store },
+  { href: '/input-pembelian',   label: 'Input Pembelian',   icon: ShoppingCart },
+  { href: '/input-penjualan',   label: 'Input Penjualan',   icon: TrendingUp },
+  { href: '/kalkulator',        label: 'Kalkulator HPP',    icon: Calculator },
+  { href: '/pricing',           label: 'Pricing Matrix',    icon: BarChart3 },
 ]
 
 interface AppSidebarProps {
