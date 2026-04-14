@@ -14,17 +14,55 @@ import {
   X,
   Store,
   TrendingUp,
+  ClipboardList,
+  Settings,
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/',                  label: 'Dashboard',         icon: LayoutDashboard },
-  { href: '/master-buah',       label: 'Master Buah',       icon: Apple },
-  { href: '/master-pemasok',    label: 'Master Pemasok',    icon: Users },
-  { href: '/master-pelanggan',  label: 'Master Pelanggan',  icon: Store },
-  { href: '/input-pembelian',   label: 'Input Pembelian',   icon: ShoppingCart },
-  { href: '/input-penjualan',   label: 'Input Penjualan',   icon: TrendingUp },
-  { href: '/kalkulator',        label: 'Kalkulator HPP',    icon: Calculator },
-  { href: '/pricing',           label: 'Pricing Matrix',    icon: BarChart3 },
+type NavItem = { href: string; label: string; icon: React.ElementType }
+type NavSection = { title: string | null; items: NavItem[] }
+
+const navSections: NavSection[] = [
+  {
+    title: null,
+    items: [
+      { href: '/',  label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'Master Data',
+    items: [
+      { href: '/master-buah',      label: 'Master Buah',      icon: Apple },
+      { href: '/master-pemasok',   label: 'Master Pemasok',   icon: Users },
+      { href: '/master-pelanggan', label: 'Master Pelanggan', icon: Store },
+    ],
+  },
+  {
+    title: 'Transaksi',
+    items: [
+      { href: '/input-pembelian', label: 'Input Pembelian', icon: ShoppingCart },
+      { href: '/input-penjualan', label: 'Input Penjualan', icon: TrendingUp },
+    ],
+  },
+  {
+    title: 'Riwayat',
+    items: [
+      { href: '/jurnal-pembelian', label: 'Jurnal Pembelian', icon: ClipboardList },
+      { href: '/jurnal-penjualan', label: 'Jurnal Penjualan', icon: ClipboardList },
+    ],
+  },
+  {
+    title: 'Analitik',
+    items: [
+      { href: '/kalkulator', label: 'Kalkulator HPP', icon: Calculator },
+      { href: '/pricing',    label: 'Pricing Matrix', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Sistem',
+    items: [
+      { href: '/pengaturan', label: 'Pengaturan', icon: Settings },
+    ],
+  },
 ]
 
 interface AppSidebarProps {
@@ -69,28 +107,39 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}  // close drawer on mobile after navigating
-              className={cn(
-                'group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              )}
-            >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              <span className="flex-1">{item.label}</span>
-              {isActive && <ChevronRight className="h-3 w-3" />}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 space-y-4 overflow-y-auto p-3">
+        {navSections.map((section, si) => (
+          <div key={si}>
+            {section.title && (
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                {section.title}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = pathname === item.href
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={cn(
+                      'group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                    {isActive && <ChevronRight className="h-3 w-3" />}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
