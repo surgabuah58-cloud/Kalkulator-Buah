@@ -36,7 +36,6 @@ const penjualanSchema = z.object({
   tanggal:          z.string().min(1, 'Tanggal wajib diisi'),
   jumlah_kg:        z.number().min(0.01, 'Jumlah harus > 0'),
   harga_jual_per_kg: z.number().min(0, 'Harga tidak boleh negatif'),
-  spare_pct:        z.number().min(0).max(100),
   catatan:          z.string().optional(),
 })
 type PenjualanFormValues = z.infer<typeof penjualanSchema>
@@ -51,6 +50,8 @@ export default function InputPenjualanPage() {
   const [pelangganList, setPelangganList] = useState<PelangganRow[]>([])
   const [hppMap, setHppMap]               = useState<Record<string, number>>({})
   const [isSaving, setIsSaving]           = useState(false)
+  const [spareMode, setSpareMode]         = useState<'pct' | 'kg' | 'pcs'>('pct')
+  const [spareRaw, setSpareRaw]           = useState('')
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -59,8 +60,7 @@ export default function InputPenjualanPage() {
     defaultValues: {
       tanggal: today,
       buah_id: '', pelanggan_id: '',
-      jumlah_kg: 0, harga_jual_per_kg: 0,
-      spare_pct: 0, catatan: '',
+      jumlah_kg: 0, harga_jual_per_kg: 0, catatan: '',
     },
   })
 
@@ -95,15 +95,55 @@ export default function InputPenjualanPage() {
     const jumlah    = watchedValues.jumlah_kg        || 0
     const hargaJual = watchedValues.harga_jual_per_kg || 0
     const hpp       = hppMap[watchedValues.buah_id]  ?? null
-    const sparePct  = watchedValues.spare_pct        || 0
-    const spareKg   = jumlah * (sparePct / 100)
-    const totalStok = jumlah + spareKg
+    const rawNum    = parseFloat(spareRaw) || 0
+
+    // Compute sparePct from local mode/value
+    let sparePct = 0
+    let spareWarning: string | null = null
+    let spareKgFromInput = 0
+    if (spareMode === 'pct') {
+      sparePct = Math.min(100, Math.max(0, rawNum))
+    } else if (spareMode === 'kg') {
+      spareKgFromInput = rawNum
+      sparePct = jumlah > 0 ? Math.min(100, (rawNum / jumlah) * 100) : 0
+    } else if (spareMode === 'pcs') {
+      const buah = buahList.find(b => b.id === watchedValues.buah_id)
+      if (buah?.berat_per_pcs_gram && buah.berat_per_pcs_gram > 0) {
+        spareKgFromInput = (rawNum * buah.berat_per_pcs_gram) / 1000
+        sparePct = jumlah > 0 ? Math.min(100, (spareKgFromInput / jumlah) * 100) : 0
+      } else if (rawNum > 0) {
+        spareWarning = 'Data berat per pcs tidak tersedia untuk buah ini'
+      }
+    }
+
+    const spareKg    = spareMode === 'kg'  ? spareKgFromInput
+                     : spareMode === 'pcs' ? spareKgFromInput
+                     : jumlah * (sparePct / 100)
+    const totalStok  = jumlah + spareKg
+
     const totalNilai  = jumlah * hargaJual
     const marginPerKg = hpp !== null ? hargaJual - hpp : null
     const totalMargin = hpp !== null ? (hargaJual - hpp) * jumlah : null
     const pctMargin   = hpp !== null && hpp > 0 ? ((hargaJual - hpp) / hpp) * 100 : null
-    return { jumlah, hargaJual, hpp, sparePct, spareKg, totalStok, totalNilai, marginPerKg, totalMargin, pctMargin }
-  }, [watchedValues.jumlah_kg, watchedValues.harga_jual_per_kg, watchedValues.spare_pct, watchedValues.buah_id, hppMap])
+
+    // HPP Efektif: biaya buffer (spareKg * HPP) dibebankan ke penjual, membebani margin
+    const biayaBuffer        = hpp !== null && spareKg > 0 ? spareKg * hpp : null
+    const hppEfektif         = hpp !== null && jumlah > 0 ? hpp * (totalStok / jumlah) : null
+    const marginEfektif      = hppEfektif !== null ? hargaJual - hppEfektif : null
+    const totalMarginEfektif = marginEfektif !== null ? marginEfektif * jumlah : null
+    const pctMarginEfektif   = hppEfektif !== null && hppEfektif > 0
+                               ? ((marginEfektif!) / hppEfektif) * 100 : null
+
+    return {
+      jumlah, hargaJual, hpp, sparePct, spareKg, totalStok, totalNilai,
+      marginPerKg, totalMargin, pctMargin,
+      biayaBuffer, hppEfektif, marginEfektif, totalMarginEfektif, pctMarginEfektif,
+      spareWarning,
+    }
+  }, [
+    watchedValues.jumlah_kg, watchedValues.harga_jual_per_kg, watchedValues.buah_id,
+    hppMap, spareMode, spareRaw, buahList,
+  ])
 
   const hasInput = preview.jumlah > 0 && preview.hargaJual > 0
 
@@ -119,7 +159,7 @@ export default function InputPenjualanPage() {
       jumlah_kg:         values.jumlah_kg,
       harga_jual_per_kg: values.harga_jual_per_kg,
       hpp_snapshot:      hppMap[values.buah_id] ?? null,
-      spare_pct:         values.spare_pct ?? 0,
+      spare_pct:         preview.sparePct,
       catatan:           values.catatan || null,
     })
 
@@ -130,9 +170,10 @@ export default function InputPenjualanPage() {
       form.reset({
         tanggal: today,
         buah_id: '', pelanggan_id: '',
-        jumlah_kg: 0, harga_jual_per_kg: 0,
-        spare_pct: 0, catatan: '',
+        jumlah_kg: 0, harga_jual_per_kg: 0, catatan: '',
       })
+      setSpareRaw('')
+      setSpareMode('pct')
     }
     setIsSaving(false)
   }
@@ -247,25 +288,53 @@ export default function InputPenjualanPage() {
                   </div>
                 </div>
                 {/* Spare / Buffer */}
-                <div className="space-y-1.5 pt-2">
+                <div className="space-y-2 pt-2">
                   <Label>
                     Spare / Buffer{' '}
-                    <span className="text-muted-foreground text-xs">(% stok cadangan untuk antisipasi buah rusak/gagal)</span>
+                    <span className="text-muted-foreground text-xs">(stok cadangan antisipasi buah rusak/gagal saat pengiriman)</span>
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number" min="0" max="100" step="0.5"
-                      placeholder="0"
-                      className="w-32"
-                      {...form.register('spare_pct', { valueAsNumber: true })}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                    {preview.sparePct > 0 && (
+                  {/* Mode toggle */}
+                  <div className="flex items-center gap-1">
+                    {(['pct', 'kg', 'pcs'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setSpareMode(m)}
+                        className={cn(
+                          'px-3 py-1 text-xs rounded-md border transition-colors',
+                          spareMode === m
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-muted-foreground border-input hover:bg-muted',
+                        )}
+                      >
+                        {m === 'pct' ? '% Persen' : m === 'kg' ? 'kg' : 'pcs'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        type="number" min="0" step="any"
+                        placeholder="0"
+                        className="w-28"
+                        value={spareRaw}
+                        onChange={(e) => setSpareRaw(e.target.value)}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {spareMode === 'pct' ? '%' : spareMode === 'kg' ? 'kg' : 'pcs'}
+                      </span>
+                    </div>
+                    {preview.spareWarning ? (
+                      <span className="text-xs text-amber-600">{preview.spareWarning}</span>
+                    ) : preview.sparePct > 0 ? (
                       <span className="text-xs text-muted-foreground">
-                        = +{formatKg(preview.spareKg)} cadangan → total stok{' '}
+                        {spareMode === 'pct' && `= +${formatKg(preview.spareKg)} cadangan`}
+                        {spareMode === 'kg'  && `= ${preview.sparePct.toFixed(2)}% dari jual`}
+                        {spareMode === 'pcs' && `= ${formatKg(preview.spareKg)} (${preview.sparePct.toFixed(2)}%)`}
+                        {' → total stok '}
                         <span className="font-medium text-foreground">{formatKg(preview.totalStok)}</span>
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -290,8 +359,10 @@ export default function InputPenjualanPage() {
       <div>
         <Card className={cn(
           'border-2 md:sticky md:top-6',
-          !hasInput ? 'border-dashed' :
-          preview.marginPerKg !== null && preview.marginPerKg >= 0 ? 'border-green-300' : 'border-red-300'
+          !hasInput ? 'border-dashed' : (() => {
+            const m = preview.sparePct > 0 ? preview.marginEfektif : preview.marginPerKg
+            return m !== null && m >= 0 ? 'border-green-300' : 'border-red-300'
+          })()
         )}>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -317,7 +388,7 @@ export default function InputPenjualanPage() {
                   {preview.sparePct > 0 && (
                     <>
                       <div className="flex justify-between text-amber-600">
-                        <span>Buffer ({preview.sparePct}%)</span>
+                        <span>Buffer ({preview.sparePct.toFixed(2)}%)</span>
                         <span className="font-medium">+{formatKg(preview.spareKg)}</span>
                       </div>
                       <div className="flex justify-between border-t border-dashed border-muted pt-1">
@@ -332,8 +403,14 @@ export default function InputPenjualanPage() {
                   </div>
                   {preview.hpp !== null && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">HPP/kg (snapshot)</span>
+                      <span className="text-muted-foreground">HPP/kg</span>
                       <span className="font-medium">{formatRupiahFull(preview.hpp)}</span>
+                    </div>
+                  )}
+                  {preview.hppEfektif !== null && preview.sparePct > 0 && (
+                    <div className="flex justify-between text-amber-700">
+                      <span className="font-medium">HPP Efektif/kg</span>
+                      <span className="font-semibold">{formatRupiahFull(preview.hppEfektif)}</span>
                     </div>
                   )}
                 </div>
@@ -353,7 +430,9 @@ export default function InputPenjualanPage() {
                     <div className="space-y-2 text-xs">
                       <p className="font-semibold text-muted-foreground uppercase tracking-wide">Analisa Margin</p>
                       <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Margin/kg</span>
+                        <span className="text-muted-foreground">
+                          {preview.sparePct > 0 ? 'Margin Nominal/kg' : 'Margin/kg'}
+                        </span>
                         <span className={cn(
                           'font-semibold flex items-center gap-1',
                           preview.marginPerKg >= 0 ? 'text-green-600' : 'text-red-600'
@@ -364,35 +443,85 @@ export default function InputPenjualanPage() {
                           {formatRupiahFull(preview.marginPerKg)}
                         </span>
                       </div>
-                      {preview.totalMargin !== null && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Margin</span>
-                          <span className={cn('font-semibold', preview.totalMargin >= 0 ? 'text-green-600' : 'text-red-600')}>
-                            {formatRupiahFull(preview.totalMargin)}
-                          </span>
+
+                      {/* Buffer cost impact */}
+                      {preview.biayaBuffer !== null && preview.biayaBuffer > 0 && (
+                        <div className="flex justify-between text-amber-600">
+                          <span>Biaya Buffer ({preview.sparePct.toFixed(2)}%)</span>
+                          <span className="font-medium">−{formatRupiahFull(preview.biayaBuffer)}</span>
                         </div>
                       )}
-                      {preview.pctMargin !== null && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Margin %</span>
-                          <span className={cn('font-semibold', preview.pctMargin >= 0 ? 'text-green-600' : 'text-red-600')}>
-                            {preview.pctMargin >= 0 ? '+' : ''}{preview.pctMargin.toFixed(1)}%
-                          </span>
-                        </div>
+
+                      {/* Effective margin after buffer */}
+                      {preview.marginEfektif !== null && preview.sparePct > 0 ? (
+                        <>
+                          <div className="flex justify-between items-center border-t border-dashed border-muted pt-1">
+                            <span className="font-semibold">Margin Efektif/kg</span>
+                            <span className={cn(
+                              'font-bold flex items-center gap-1',
+                              preview.marginEfektif >= 0 ? 'text-green-600' : 'text-red-600'
+                            )}>
+                              {preview.marginEfektif >= 0
+                                ? <TrendingUp className="h-3 w-3" />
+                                : <TrendingDown className="h-3 w-3" />}
+                              {formatRupiahFull(preview.marginEfektif)}
+                            </span>
+                          </div>
+                          {preview.totalMarginEfektif !== null && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Margin Efektif</span>
+                              <span className={cn('font-semibold', preview.totalMarginEfektif >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                {formatRupiahFull(preview.totalMarginEfektif)}
+                              </span>
+                            </div>
+                          )}
+                          {preview.pctMarginEfektif !== null && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Margin Efektif %</span>
+                              <span className={cn('font-semibold', preview.pctMarginEfektif >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                {preview.pctMarginEfektif >= 0 ? '+' : ''}{preview.pctMarginEfektif.toFixed(1)}%
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {preview.totalMargin !== null && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Margin</span>
+                              <span className={cn('font-semibold', preview.totalMargin >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                {formatRupiahFull(preview.totalMargin)}
+                              </span>
+                            </div>
+                          )}
+                          {preview.pctMargin !== null && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Margin %</span>
+                              <span className={cn('font-semibold', preview.pctMargin >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                {preview.pctMargin >= 0 ? '+' : ''}{preview.pctMargin.toFixed(1)}%
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
                     {/* Status */}
-                    <div className={cn(
-                      'rounded-lg p-3 text-center text-xs font-medium flex items-center justify-center gap-1.5',
-                      preview.marginPerKg >= 0
-                        ? 'bg-green-50 border border-green-200 text-green-700'
-                        : 'bg-red-50 border border-red-200 text-red-700'
-                    )}>
-                      {preview.marginPerKg >= 0
-                        ? <><CheckCircle2 className="h-3.5 w-3.5" /> Harga di atas HPP — Siap disimpan</>
-                        : <><AlertTriangle className="h-3.5 w-3.5" /> Harga di bawah HPP — Rugi</>}
-                    </div>
+                    {(() => {
+                      const m = preview.sparePct > 0 ? preview.marginEfektif : preview.marginPerKg
+                      return m !== null ? (
+                        <div className={cn(
+                          'rounded-lg p-3 text-center text-xs font-medium flex items-center justify-center gap-1.5',
+                          m >= 0
+                            ? 'bg-green-50 border border-green-200 text-green-700'
+                            : 'bg-red-50 border border-red-200 text-red-700'
+                        )}>
+                          {m >= 0
+                            ? <><CheckCircle2 className="h-3.5 w-3.5" /> Margin positif — Siap disimpan</>
+                            : <><AlertTriangle className="h-3.5 w-3.5" /> Margin negatif — Rugi</>}
+                        </div>
+                      ) : null
+                    })()}
                   </>
                 )}
               </>
