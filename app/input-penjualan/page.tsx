@@ -52,6 +52,7 @@ export default function InputPenjualanPage() {
   const [isSaving, setIsSaving]           = useState(false)
   const [spareMode, setSpareMode]         = useState<'pct' | 'kg' | 'pcs'>('pct')
   const [spareRaw, setSpareRaw]           = useState('')
+  const [tipeJual, setTipeJual]           = useState<'normal' | 'reject'>('normal')
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -160,6 +161,7 @@ export default function InputPenjualanPage() {
       harga_jual_per_kg: values.harga_jual_per_kg,
       hpp_snapshot:      hppMap[values.buah_id] ?? null,
       spare_pct:         preview.sparePct,
+      tipe_jual:         tipeJual,
       catatan:           values.catatan || null,
     })
 
@@ -174,6 +176,7 @@ export default function InputPenjualanPage() {
       })
       setSpareRaw('')
       setSpareMode('pct')
+      setTipeJual('normal')
     }
     setIsSaving(false)
   }
@@ -287,6 +290,33 @@ export default function InputPenjualanPage() {
                     )}
                   </div>
                 </div>
+                {/* Tipe Jual */}
+                <div className="space-y-2 pt-2">
+                  <Label>Tipe Penjualan</Label>
+                  <div className="flex items-center gap-1">
+                    {(['normal', 'reject'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTipeJual(t)}
+                        className={cn(
+                          'px-3 py-1 text-xs rounded-md border transition-colors',
+                          tipeJual === t
+                            ? t === 'normal'
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-amber-500 text-white border-amber-500'
+                            : 'bg-background text-muted-foreground border-input hover:bg-muted',
+                        )}
+                      >
+                        {t === 'normal' ? 'Normal' : 'Reject'}
+                      </button>
+                    ))}
+                    {tipeJual === 'reject' && (
+                      <span className="ml-2 text-xs text-amber-600">Stok buah kelas reject</span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Spare / Buffer */}
                 <div className="space-y-2 pt-2">
                   <Label>

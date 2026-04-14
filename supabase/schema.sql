@@ -117,6 +117,8 @@ CREATE TABLE IF NOT EXISTS penjualan (
   hpp_snapshot          DECIMAL(15,2),  -- HPP saat transaksi (dari v_latest_hpp)
   spare_pct             DECIMAL(5,2)  NOT NULL DEFAULT 0 CHECK (spare_pct >= 0 AND spare_pct <= 100),
   margin_per_kg         DECIMAL(15,2) GENERATED ALWAYS AS (harga_jual_per_kg - COALESCE(hpp_snapshot, 0)) STORED,
+  tipe_jual             VARCHAR(10) NOT NULL DEFAULT 'normal' CHECK (tipe_jual IN ('normal', 'reject')),
+  sortir_id             UUID,  -- FK ke hasil_sortir (diisi setelah tabel tersebut dibuat)
   catatan               TEXT,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -125,6 +127,103 @@ CREATE TABLE IF NOT EXISTS penjualan (
 CREATE INDEX IF NOT EXISTS idx_penjualan_buah_id     ON penjualan(buah_id);
 CREATE INDEX IF NOT EXISTS idx_penjualan_pelanggan_id ON penjualan(pelanggan_id);
 CREATE INDEX IF NOT EXISTS idx_penjualan_tanggal      ON penjualan(tanggal DESC);
+
+-- Hasil Sortir (Actual Sort Results per Purchase Batch)
+-- Dicatat oleh tim gudang setelah proses sortir selesai
+CREATE TABLE IF NOT EXISTS hasil_sortir (
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  no_sortir             VARCHAR(50) UNIQUE,
+  pembelian_id          UUID NOT NULL REFERENCES pembelian(id) ON DELETE RESTRICT,
+  tanggal_sortir        DATE NOT NULL DEFAULT CURRENT_DATE,
+
+  -- Hasil aktual pemilahan fisik
+  kg_baik               DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (kg_baik >= 0),    -- siap jual normal
+  kg_reject             DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (kg_reject >= 0),  -- jual harga reject
+  kg_busuk              DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (kg_busuk >= 0),   -- waste, tidak dijual
+
+  -- Harga reject bisa dikustomisasi per batch
+  harga_jual_reject_per_kg  DECIMAL(15,2) DEFAULT 0,
+
+  catatan               TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hasil_sortir_pembelian_id ON hasil_sortir(pembelian_id);
+CREATE INDEX IF NOT EXISTS idx_hasil_sortir_tanggal      ON hasil_sortir(tanggal_sortir DESC);
+
+ALTER TABLE hasil_sortir ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_hasil_sortir" ON hasil_sortir FOR ALL USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE TRIGGER trigger_hasil_sortir_updated_at
+  BEFORE UPDATE ON hasil_sortir
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE SEQUENCE IF NOT EXISTS sortir_sequence START 1;
+CREATE OR REPLACE FUNCTION generate_no_sortir()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.no_sortir IS NULL THEN
+    NEW.no_sortir := 'SRT-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
+                    LPAD(NEXTVAL('sortir_sequence')::TEXT, 4, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trigger_hasil_sortir_no_sortir
+  BEFORE INSERT ON hasil_sortir
+  FOR EACH ROW EXECUTE FUNCTION generate_no_sortir();
+
+-- Tambah FK sortir_id ke penjualan setelah hasil_sortir dibuat
+ALTER TABLE penjualan
+  ADD CONSTRAINT fk_penjualan_sortir
+  FOREIGN KEY (sortir_id) REFERENCES hasil_sortir(id) ON DELETE SET NULL;
+
+-- Retur ke Pemasok
+-- Mencatat pengembalian barang ke pemasok beserta kredit yang diterima
+CREATE TABLE IF NOT EXISTS retur_pemasok (
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  no_retur              VARCHAR(50) UNIQUE,
+  pembelian_id          UUID NOT NULL REFERENCES pembelian(id) ON DELETE RESTRICT,
+  tanggal               DATE NOT NULL DEFAULT CURRENT_DATE,
+
+  kg_diretur            DECIMAL(10,2) NOT NULL CHECK (kg_diretur > 0),
+  -- Kredit dari pemasok per kg (bisa berbeda dari harga beli awal)
+  harga_kredit_per_kg   DECIMAL(15,2) NOT NULL DEFAULT 0 CHECK (harga_kredit_per_kg >= 0),
+  total_kredit          DECIMAL(15,2) GENERATED ALWAYS AS (kg_diretur * harga_kredit_per_kg) STORED,
+
+  alasan                TEXT,
+  catatan               TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_retur_pemasok_pembelian_id ON retur_pemasok(pembelian_id);
+CREATE INDEX IF NOT EXISTS idx_retur_pemasok_tanggal      ON retur_pemasok(tanggal DESC);
+
+ALTER TABLE retur_pemasok ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_retur_pemasok" ON retur_pemasok FOR ALL USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE TRIGGER trigger_retur_pemasok_updated_at
+  BEFORE UPDATE ON retur_pemasok
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE SEQUENCE IF NOT EXISTS retur_sequence START 1;
+CREATE OR REPLACE FUNCTION generate_no_retur()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.no_retur IS NULL THEN
+    NEW.no_retur := 'RTR-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
+                   LPAD(NEXTVAL('retur_sequence')::TEXT, 4, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trigger_retur_pemasok_no_retur
+  BEFORE INSERT ON retur_pemasok
+  FOR EACH ROW EXECUTE FUNCTION generate_no_retur();
 
 ALTER TABLE pelanggan ENABLE ROW LEVEL SECURITY;
 ALTER TABLE penjualan ENABLE ROW LEVEL SECURITY;
@@ -225,6 +324,60 @@ SELECT
 FROM buah b
 LEFT JOIN v_latest_hpp lh ON lh.buah_id = b.id
 LEFT JOIN pricing pr ON pr.buah_id = b.id
+WHERE b.is_active = TRUE;
+
+-- View: Stok Tersedia per Buah (produk grade baik)
+-- kg masuk = Σ kg_baik dari hasil_sortir
+-- kg keluar = Σ jumlah_kg dari penjualan tipe 'normal'
+CREATE OR REPLACE VIEW v_stok_tersedia AS
+SELECT
+  b.id AS buah_id,
+  b.nama AS nama_buah,
+  b.kode AS kode_buah,
+  COALESCE(masuk.total_kg_baik, 0)    AS total_kg_masuk,
+  COALESCE(keluar.total_kg_jual, 0)   AS total_kg_keluar,
+  COALESCE(masuk.total_kg_baik, 0) - COALESCE(keluar.total_kg_jual, 0) AS stok_tersedia
+FROM buah b
+LEFT JOIN (
+  SELECT p.buah_id, SUM(hs.kg_baik) AS total_kg_baik
+  FROM hasil_sortir hs
+  JOIN pembelian p ON p.id = hs.pembelian_id
+  GROUP BY p.buah_id
+) masuk ON masuk.buah_id = b.id
+LEFT JOIN (
+  SELECT buah_id, SUM(jumlah_kg) AS total_kg_jual
+  FROM penjualan
+  WHERE tipe_jual = 'normal'
+  GROUP BY buah_id
+) keluar ON keluar.buah_id = b.id
+WHERE b.is_active = TRUE;
+
+-- View: Stok Reject per Buah
+CREATE OR REPLACE VIEW v_stok_reject AS
+SELECT
+  b.id AS buah_id,
+  b.nama AS nama_buah,
+  b.kode AS kode_buah,
+  COALESCE(masuk.total_kg_reject, 0)  AS total_kg_reject_masuk,
+  COALESCE(keluar.total_kg_jual, 0)   AS total_kg_reject_keluar,
+  COALESCE(masuk.total_kg_reject, 0) - COALESCE(keluar.total_kg_jual, 0) AS stok_reject_tersedia,
+  COALESCE(masuk.harga_reject_terakhir, 0) AS harga_reject_per_kg
+FROM buah b
+LEFT JOIN (
+  SELECT p.buah_id,
+         SUM(hs.kg_reject) AS total_kg_reject,
+         (ARRAY_AGG(hs.harga_jual_reject_per_kg ORDER BY hs.tanggal_sortir DESC))[1] AS harga_reject_terakhir
+  FROM hasil_sortir hs
+  JOIN pembelian p ON p.id = hs.pembelian_id
+  WHERE hs.kg_reject > 0
+  GROUP BY p.buah_id
+) masuk ON masuk.buah_id = b.id
+LEFT JOIN (
+  SELECT buah_id, SUM(jumlah_kg) AS total_kg_jual
+  FROM penjualan
+  WHERE tipe_jual = 'reject'
+  GROUP BY buah_id
+) keluar ON keluar.buah_id = b.id
 WHERE b.is_active = TRUE;
 
 -- ============================================================

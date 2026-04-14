@@ -33,6 +33,7 @@ type PenjualanRow = {
   hpp_snapshot: number | null
   margin_per_kg: number | null
   spare_pct: number | null
+  tipe_jual: string | null
   catatan: string | null
   created_at: string
   buah:     { nama: string } | null
@@ -68,7 +69,7 @@ export default function JurnalPenjualanPage() {
     setIsLoading(true)
     let query = supabase
       .from('penjualan')
-      .select('id, no_transaksi, tanggal, jumlah_kg, harga_jual_per_kg, total_nilai, hpp_snapshot, margin_per_kg, spare_pct, catatan, created_at, buah:buah_id(nama), pelanggan:pelanggan_id(nama, tipe)')
+      .select('id, no_transaksi, tanggal, jumlah_kg, harga_jual_per_kg, total_nilai, hpp_snapshot, margin_per_kg, spare_pct, tipe_jual, catatan, created_at, buah:buah_id(nama), pelanggan:pelanggan_id(nama, tipe)')
       .order('tanggal', { ascending: false })
       .order('created_at', { ascending: false })
 
@@ -217,6 +218,7 @@ export default function JurnalPenjualanPage() {
                   <TableHead className="text-right">Harga Jual/kg</TableHead>
                   <TableHead className="text-right">Total Nilai</TableHead>
                   <TableHead className="text-right">Margin/kg</TableHead>
+                  <TableHead className="text-center">Tipe</TableHead>
                   <TableHead className="text-center">Buffer%</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -251,6 +253,11 @@ export default function JurnalPenjualanPage() {
                           {formatRupiahFull(row.margin_per_kg)}
                         </span>
                       ) : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {row.tipe_jual === 'reject'
+                        ? <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">Reject</Badge>
+                        : <Badge variant="outline" className="text-xs text-green-700 border-green-300">Normal</Badge>}
                     </TableCell>
                     <TableCell className="text-center">
                       {row.spare_pct != null && row.spare_pct > 0

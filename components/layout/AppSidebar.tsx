@@ -16,6 +16,8 @@ import {
   TrendingUp,
   ClipboardList,
   Settings,
+  SlidersHorizontal,
+  Undo2,
 } from 'lucide-react'
 
 type NavItem = { href: string; label: string; icon: React.ElementType }
@@ -41,6 +43,8 @@ const navSections: NavSection[] = [
     items: [
       { href: '/input-pembelian', label: 'Input Pembelian', icon: ShoppingCart },
       { href: '/input-penjualan', label: 'Input Penjualan', icon: TrendingUp },
+      { href: '/input-sortir',   label: 'Input Sortir',    icon: SlidersHorizontal },
+      { href: '/retur-pemasok',  label: 'Retur Pemasok',   icon: Undo2 },
     ],
   },
   {

@@ -80,6 +80,8 @@ export interface Database {
           hpp_snapshot: number | null
           spare_pct: number | null
           margin_per_kg: number | null
+          tipe_jual: 'normal' | 'reject'
+          sortir_id: string | null
           catatan: string | null
           created_at: string
           updated_at: string
@@ -94,6 +96,8 @@ export interface Database {
           harga_jual_per_kg: number
           hpp_snapshot?: number | null
           spare_pct?: number | null
+          tipe_jual?: 'normal' | 'reject'
+          sortir_id?: string | null
           catatan?: string | null
           created_at?: string
           updated_at?: string
@@ -106,6 +110,82 @@ export interface Database {
           harga_jual_per_kg?: number
           hpp_snapshot?: number | null
           spare_pct?: number | null
+          tipe_jual?: 'normal' | 'reject'
+          sortir_id?: string | null
+          catatan?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hasil_sortir: {
+        Row: {
+          id: string
+          no_sortir: string | null
+          pembelian_id: string
+          tanggal_sortir: string
+          kg_baik: number
+          kg_reject: number
+          kg_busuk: number
+          harga_jual_reject_per_kg: number | null
+          catatan: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          no_sortir?: string | null
+          pembelian_id: string
+          tanggal_sortir?: string
+          kg_baik?: number
+          kg_reject?: number
+          kg_busuk?: number
+          harga_jual_reject_per_kg?: number | null
+          catatan?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          tanggal_sortir?: string
+          kg_baik?: number
+          kg_reject?: number
+          kg_busuk?: number
+          harga_jual_reject_per_kg?: number | null
+          catatan?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      retur_pemasok: {
+        Row: {
+          id: string
+          no_retur: string | null
+          pembelian_id: string
+          tanggal: string
+          kg_diretur: number
+          harga_kredit_per_kg: number
+          total_kredit: number
+          alasan: string | null
+          catatan: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          no_retur?: string | null
+          pembelian_id: string
+          tanggal?: string
+          kg_diretur: number
+          harga_kredit_per_kg?: number
+          alasan?: string | null
+          catatan?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          tanggal?: string
+          kg_diretur?: number
+          harga_kredit_per_kg?: number
+          alasan?: string | null
           catatan?: string | null
           updated_at?: string
         }
@@ -340,6 +420,29 @@ export interface Database {
         }
         Relationships: []
       }
+      v_stok_tersedia: {
+        Row: {
+          buah_id: string
+          nama_buah: string
+          kode_buah: string | null
+          total_kg_masuk: number
+          total_kg_keluar: number
+          stok_tersedia: number
+        }
+        Relationships: []
+      }
+      v_stok_reject: {
+        Row: {
+          buah_id: string
+          nama_buah: string
+          kode_buah: string | null
+          total_kg_reject_masuk: number
+          total_kg_reject_keluar: number
+          stok_reject_tersedia: number
+          harga_reject_per_kg: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
@@ -378,5 +481,13 @@ export type PelangganUpdate = Database['public']['Tables']['pelanggan']['Update'
 export type PenjualanRow    = Database['public']['Tables']['penjualan']['Row']
 export type PenjualanInsert = Database['public']['Tables']['penjualan']['Insert']
 
+export type HasilSortirRow    = Database['public']['Tables']['hasil_sortir']['Row']
+export type HasilSortirInsert = Database['public']['Tables']['hasil_sortir']['Insert']
+
+export type ReturPemasokRow    = Database['public']['Tables']['retur_pemasok']['Row']
+export type ReturPemasokInsert = Database['public']['Tables']['retur_pemasok']['Insert']
+
 export type LatestHppRow     = Database['public']['Views']['v_latest_hpp']['Row']
 export type PricingMatrixRow = Database['public']['Views']['v_pricing_matrix']['Row']
+export type StokTersediaRow  = Database['public']['Views']['v_stok_tersedia']['Row']
+export type StokRejectRow    = Database['public']['Views']['v_stok_reject']['Row']
