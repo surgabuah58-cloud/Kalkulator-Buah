@@ -207,9 +207,19 @@ export default function KasMasukPage() {
 
                 <div className="flex justify-end">
                   <Button
-                    type="submit"
+                    type="button"
                     disabled={isSaving}
-                    onClick={() => console.log('[KasMasuk] 🖱️ Tombol Simpan diklik, form values:', form.getValues())}
+                    onClick={async () => {
+                      console.log('[KasMasuk] onClick values:', form.getValues())
+                      console.log('[KasMasuk] formErrors:', form.formState.errors)
+                      try {
+                        await form.handleSubmit(onSubmit, (errors) => {
+                          console.error('[KasMasuk] ❌ Validasi gagal:', JSON.stringify(errors, null, 2))
+                        })()
+                      } catch (e) {
+                        console.error('[KasMasuk] 💥 handleSubmit exception:', e)
+                      }
+                    }}
                   >
                     {isSaving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                     Simpan
