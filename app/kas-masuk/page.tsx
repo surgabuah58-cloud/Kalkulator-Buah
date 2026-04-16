@@ -71,16 +71,25 @@ export default function KasMasukPage() {
 
   async function onSubmit(values: KasFormValues) {
     setIsSaving(true)
-    const { error } = await supabase.from('kas_masuk').insert({
+    const payload = {
       tanggal:   values.tanggal,
       kategori:  values.kategori as KasMasukRow['kategori'],
       jumlah:    values.jumlah,
       deskripsi: values.deskripsi,
       catatan:   values.catatan || null,
-    })
+    }
+    console.log('[KasMasuk] onSubmit payload:', payload)
+    const { data, error } = await supabase.from('kas_masuk').insert(payload).select()
     if (error) {
+      console.error('[KasMasuk] INSERT error:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
       toast.error('Gagal menyimpan: ' + error.message)
     } else {
+      console.log('[KasMasuk] INSERT berhasil:', data)
       toast.success('Kas masuk berhasil dicatat')
       form.reset({ tanggal: today, kategori: '', jumlah: 0, deskripsi: '', catatan: '' })
       setJumlahVal(0)
