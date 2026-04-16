@@ -141,7 +141,10 @@ export default function KasMasukPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                console.error('[KasMasuk] ❌ Validasi GAGAL:', JSON.stringify(errors, null, 2))
+                console.log('[KasMasuk] Nilai form saat ini:', form.getValues())
+              })} className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Tanggal <span className="text-red-500">*</span></Label>
@@ -203,7 +206,11 @@ export default function KasMasukPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={isSaving}>
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    onClick={() => console.log('[KasMasuk] 🖱️ Tombol Simpan diklik, form values:', form.getValues())}
+                  >
                     {isSaving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                     Simpan
                   </Button>
