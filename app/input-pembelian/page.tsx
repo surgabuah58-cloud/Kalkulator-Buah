@@ -41,6 +41,21 @@ const pembelianSchema = z.object({
 type PembelianFormValues = z.infer<typeof pembelianSchema>
 
 // ============================================================
+// KONSTANTA
+// ============================================================
+const SATUAN_OPTIONS = [
+  { value: 'peti',    label: 'Peti'    },
+  { value: 'dus',     label: 'Dus'     },
+  { value: 'karung',  label: 'Karung'  },
+  { value: 'kg',      label: 'Kg'      },
+  { value: 'pcs',     label: 'Pcs'     },
+  { value: 'ikat',    label: 'Ikat'    },
+  { value: 'koli',    label: 'Koli'    },
+  { value: 'pak',     label: 'Pak'     },
+  { value: 'ton',     label: 'Ton'     },
+]
+
+// ============================================================
 // KOMPONEN UTAMA
 // ============================================================
 export default function InputPembelianPage() {
@@ -51,6 +66,7 @@ export default function InputPembelianPage() {
   const [pemasokList, setPemasokList]   = useState<PemasokRow[]>([])
   const [selectedBuah, setSelectedBuah] = useState<BuahRow | null>(null)
   const [isSaving, setIsSaving]         = useState(false)
+  const [satuanOverride, setSatuanOverride] = useState<string | null>(null)
 
   // State lokal Rupiah fields (untuk format pemisah ribuan)
   const [hargaBeliVal,     setHargaBeliVal]     = useState(0)
@@ -58,10 +74,9 @@ export default function InputPembelianPage() {
   const [sortirVal,        setSortirVal]        = useState(0)
   const [recoveryVal,      setRecoveryVal]      = useState(0)
 
-  // Satuan label dinamis dari master buah
-  const satuanLabel = selectedBuah?.satuan
-    ? selectedBuah.satuan.charAt(0).toUpperCase() + selectedBuah.satuan.slice(1)
-    : 'Peti'
+  // Satuan efektif: override manual > master buah > default 'peti'
+  const satuanRaw = satuanOverride ?? selectedBuah?.satuan ?? 'peti'
+  const satuanLabel = satuanRaw.charAt(0).toUpperCase() + satuanRaw.slice(1)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -98,8 +113,10 @@ export default function InputPembelianPage() {
     if (watchedValues.buah_id) {
       const found = buahList.find(b => b.id === watchedValues.buah_id)
       setSelectedBuah(found ?? null)
+      setSatuanOverride(null) // reset ke satuan dari master buah
     } else {
       setSelectedBuah(null)
+      setSatuanOverride(null)
     }
   }, [watchedValues.buah_id, buahList])
 
@@ -186,6 +203,8 @@ export default function InputPembelianPage() {
         biaya_transport_borongan: 0, total_biaya_regu_sortir: 0,
         nilai_recovery_afkir: 0, catatan: '',
       })
+      setHargaBeliVal(0); setTransportVal(0); setSortirVal(0); setRecoveryVal(0)
+      setSatuanOverride(null)
     }
     setIsSaving(false)
   }
@@ -218,12 +237,16 @@ export default function InputPembelianPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              {/* Baris 1: Tanggal, Buah, Pemasok */}
+              {/* Baris 1: Tanggal */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Tanggal <span className="text-red-500">*</span></Label>
                   <Input type="date" {...form.register('tanggal')} />
                 </div>
+              </div>
+
+              {/* Baris 2: Buah + Pemasok — 2 kolom lebar agar dropdown tidak bertabrakan */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Buah <span className="text-red-500">*</span></Label>
                   <Select
@@ -276,6 +299,34 @@ export default function InputPembelianPage() {
                   Data Fisik
                 </p>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {/* Satuan Kemasan — override manual */}
+                  <div className="space-y-1.5 col-span-2 sm:col-span-3">
+                    <Label>Satuan Kemasan</Label>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={satuanRaw}
+                        onValueChange={(v) => setSatuanOverride(v)}
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          {SATUAN_OPTIONS.map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedBuah && selectedBuah.satuan && satuanOverride && satuanOverride !== selectedBuah.satuan && (
+                        <span className="text-xs text-amber-600">
+                          Default dari master: <strong>{selectedBuah.satuan}</strong> — sedang di-override
+                        </span>
+                      )}
+                      {(!satuanOverride || (selectedBuah && satuanOverride === selectedBuah.satuan)) && selectedBuah?.satuan && (
+                        <span className="text-xs text-muted-foreground">Dari master buah</span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <Label>Jumlah {satuanLabel}</Label>
                     <Input type="number" min="0.1" step="0.1" {...form.register('jumlah_peti', { valueAsNumber: true })} />
