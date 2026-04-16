@@ -1,9 +1,6 @@
-'use client'
+﻿'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useSeason } from '@/context/season-context'
@@ -20,40 +17,58 @@ import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { AlertTriangle, Calculator, CheckCircle2, Loader2, Sun, CloudRain } from 'lucide-react'
+import { AlertTriangle, Calculator, Loader2, Sun, CloudRain, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-// ============================================================
-// SCHEMA VALIDASI
-// ============================================================
-const pembelianSchema = z.object({
-  buah_id:                    z.string().min(1, 'Pilih buah'),
-  pemasok_id:                 z.string().min(1, 'Pilih pemasok'),
-  tanggal:                    z.string().min(1, 'Tanggal wajib diisi'),
-  jumlah_peti:                z.number().min(0.1, 'Min. 0.1 kemasan'),
-  harga_beli_per_peti:        z.number().min(0),
-  berat_bruto_per_kemasan:    z.number().min(0.01, 'Berat per kemasan harus > 0'),
-  biaya_transport_borongan:   z.number().min(0),
-  total_biaya_regu_sortir:    z.number().min(0),
-  nilai_recovery_afkir:       z.number().min(0),
-  catatan:                    z.string().optional(),
-})
-type PembelianFormValues = z.infer<typeof pembelianSchema>
 
 // ============================================================
 // KONSTANTA
 // ============================================================
 const SATUAN_OPTIONS = [
-  { value: 'peti',    label: 'Peti'    },
-  { value: 'dus',     label: 'Dus'     },
-  { value: 'karung',  label: 'Karung'  },
-  { value: 'kg',      label: 'Kg'      },
-  { value: 'pcs',     label: 'Pcs'     },
-  { value: 'ikat',    label: 'Ikat'    },
-  { value: 'koli',    label: 'Koli'    },
-  { value: 'pak',     label: 'Pak'     },
-  { value: 'ton',     label: 'Ton'     },
+  { value: 'peti',   label: 'Peti'   },
+  { value: 'dus',    label: 'Dus'    },
+  { value: 'karung', label: 'Karung' },
+  { value: 'kg',     label: 'Kg'     },
+  { value: 'pcs',    label: 'Pcs'    },
+  { value: 'ikat',   label: 'Ikat'   },
+  { value: 'koli',   label: 'Koli'   },
+  { value: 'pak',    label: 'Pak'    },
+  { value: 'ton',    label: 'Ton'    },
 ]
+
+// ============================================================
+// TIPE DATA ITEM
+// ============================================================
+interface ItemState {
+  key: string
+  buahId: string
+  satuanOverride: string | undefined
+  jumlah: string
+  beratBruto: string   // tidak dipakai saat satuan=kg (auto=1)
+  pcsPerKg: string     // opsional, hanya tampilan estimasi
+  hargaBeli: number
+  transport: number
+  sortir: number
+  recovery: number
+  catatan: string
+  errors: Record<string, string>
+}
+
+function emptyItem(): ItemState {
+  return {
+    key: Math.random().toString(36).slice(2),
+    buahId: '',
+    satuanOverride: undefined,
+    jumlah: '1',
+    beratBruto: '',
+    pcsPerKg: '',
+    hargaBeli: 0,
+    transport: 0,
+    sortir: 0,
+    recovery: 0,
+    catatan: '',
+    errors: {},
+  }
+}
 
 // ============================================================
 // KOMPONEN UTAMA
@@ -62,36 +77,16 @@ export default function InputPembelianPage() {
   const supabase = createClient()
   const { musim, isKemarau } = useSeason()
 
-  const [buahList, setBuahList]         = useState<BuahRow[]>([])
-  const [pemasokList, setPemasokList]   = useState<PemasokRow[]>([])
-  const [selectedBuah, setSelectedBuah] = useState<BuahRow | null>(null)
-  const [isSaving, setIsSaving]         = useState(false)
-  const [satuanOverride, setSatuanOverride] = useState<string | null>(null)
-
-  // State lokal Rupiah fields (untuk format pemisah ribuan)
-  const [hargaBeliVal,     setHargaBeliVal]     = useState(0)
-  const [transportVal,     setTransportVal]     = useState(0)
-  const [sortirVal,        setSortirVal]        = useState(0)
-  const [recoveryVal,      setRecoveryVal]      = useState(0)
-
-  // Satuan efektif: override manual > master buah > default 'peti'
-  const satuanRaw = satuanOverride ?? selectedBuah?.satuan ?? 'peti'
-  const satuanLabel = satuanRaw.charAt(0).toUpperCase() + satuanRaw.slice(1)
+  const [buahList, setBuahList]       = useState<BuahRow[]>([])
+  const [pemasokList, setPemasokList] = useState<PemasokRow[]>([])
+  const [isSaving, setIsSaving]       = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
+  const [tanggal, setTanggal]           = useState(today)
+  const [pemasokId, setPemasokId]       = useState('')
+  const [pemasokError, setPemasokError] = useState('')
 
-  const form = useForm<PembelianFormValues>({ 
-    resolver: zodResolver(pembelianSchema),
-    defaultValues: {
-      buah_id: '', pemasok_id: '', tanggal: today,
-      jumlah_peti: 1, harga_beli_per_peti: 0, berat_bruto_per_kemasan: 0,
-      biaya_transport_borongan: 0, total_biaya_regu_sortir: 0,
-      nilai_recovery_afkir: 0, catatan: '',
-    },
-  })
-
-  // Watch semua field untuk live kalkulasi
-  const watchedValues = useWatch({ control: form.control })
+  const [items, setItems] = useState<ItemState[]>([emptyItem()])
 
   // ============================================================
   // FETCH DATA MASTER
@@ -108,118 +103,183 @@ export default function InputPembelianPage() {
     fetchMasterData()
   }, [])
 
-  // Update selectedBuah saat buah_id berubah
-  useEffect(() => {
-    if (watchedValues.buah_id) {
-      const found = buahList.find(b => b.id === watchedValues.buah_id)
-      setSelectedBuah(found ?? null)
-      setSatuanOverride(null) // reset ke satuan dari master buah
-    } else {
-      setSelectedBuah(null)
-      setSatuanOverride(null)
-    }
-  }, [watchedValues.buah_id, buahList])
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  function updateItem(key: string, patch: Partial<ItemState>) {
+    setItems(prev => prev.map(it => it.key === key ? { ...it, ...patch } : it))
+  }
+
+  function removeItem(key: string) {
+    setItems(prev => prev.filter(it => it.key !== key))
+  }
+
+  function addItem() {
+    setItems(prev => [...prev, emptyItem()])
+  }
+
+  function getItemBuah(item: ItemState): BuahRow | null {
+    return buahList.find(b => b.id === item.buahId) ?? null
+  }
+
+  function getItemSatuan(item: ItemState): string {
+    const buah = getItemBuah(item)
+    return item.satuanOverride ?? buah?.satuan ?? 'peti'
+  }
 
   // ============================================================
-  // LIVE KALKULASI HPP (useMemo — tidak re-render berlebihan)
+  // HPP KALKULASI PER ITEM
+  // Kunci: satuan=kg -> beratPetiMusim=0 (tidak ada tara kemasan),
+  //        beratBrutoPerKemasan=1 sehingga beratBrutoTotal = jumlahKg
   // ============================================================
-  const hppResult = useMemo(() => {
-    if (!selectedBuah) return null
+  function computeItemHpp(item: ItemState) {
+    const buah = getItemBuah(item)
+    if (!buah) return null
 
-    const beratPetiMusim = isKemarau
-      ? selectedBuah.berat_peti_kemarau
-      : selectedBuah.berat_peti_hujan
-    const pctAfkirMusim = isKemarau
-      ? selectedBuah.pct_afkir_kemarau
-      : selectedBuah.pct_afkir_hujan
+    const satuan   = getItemSatuan(item)
+    const isKgMode = satuan === 'kg'
+    const jumlah   = parseFloat(item.jumlah) || 0
+    const beratBrutoPerKemasan  = isKgMode ? 1 : (parseFloat(item.beratBruto) || 0)
+    const beratBrutoTotal       = beratBrutoPerKemasan * jumlah
+    const biayaTransportPerPeti = jumlah > 0 ? item.transport / jumlah : 0
 
-    const params = {
-      jumlahPeti:             Number(watchedValues.jumlah_peti)                  || 0,
-      hargaBeliPerPeti:       Number(watchedValues.harga_beli_per_peti)          || 0,
-      // Auto-hitung berat bruto total dari per kemasan × jumlah
-      beratBrutoTotal:        (Number(watchedValues.berat_bruto_per_kemasan) || 0)
-                              * (Number(watchedValues.jumlah_peti) || 0),
-      // Auto-bagi transport borongan dengan jumlah kemasan
-      biayaTransportPerPeti:  Number(watchedValues.jumlah_peti) > 0
-                                ? (Number(watchedValues.biaya_transport_borongan) || 0) / Number(watchedValues.jumlah_peti)
-                                : 0,
-      totalBiayaReguSortir:   Number(watchedValues.total_biaya_regu_sortir)      || 0,
-      nilaiRecoveryAfkir:     Number(watchedValues.nilai_recovery_afkir)         || 0,
+    // Saat satuan=kg: tidak ada berat tara kemasan
+    const beratPetiMusim = isKgMode ? 0 : (isKemarau ? buah.berat_peti_kemarau : buah.berat_peti_hujan)
+    const pctAfkirMusim  = isKemarau ? buah.pct_afkir_kemarau : buah.pct_afkir_hujan
+
+    // Estimasi pcs: bila diisi "X pcs per kg", beratPerPcsGram = 1000/X
+    const pcsPerKgNum     = parseFloat(item.pcsPerKg) || 0
+    const beratPerPcsGram = (isKgMode && pcsPerKgNum > 0) ? 1000 / pcsPerKgNum : undefined
+
+    return calculateHpp({
+      jumlahPeti:            jumlah,
+      hargaBeliPerPeti:      item.hargaBeli,
+      beratBrutoTotal,
+      biayaTransportPerPeti,
+      totalBiayaReguSortir:  item.sortir,
+      nilaiRecoveryAfkir:    item.recovery,
       beratPetiMusim,
       pctAfkirMusim,
+      beratPerPcsGram,
+    })
+  }
+
+  // ============================================================
+  // VALIDASI PER ITEM
+  // ============================================================
+  function validateItem(item: ItemState): Record<string, string> {
+    const errors: Record<string, string> = {}
+    const satuan   = getItemSatuan(item)
+    const isKgMode = satuan === 'kg'
+
+    if (!item.buahId) errors.buahId = 'Pilih buah'
+
+    const jumlah = parseFloat(item.jumlah)
+    if (!jumlah || jumlah <= 0) errors.jumlah = 'Jumlah harus > 0'
+
+    if (!isKgMode) {
+      const bb = parseFloat(item.beratBruto)
+      if (!bb || bb <= 0) errors.beratBruto = 'Berat bruto per kemasan harus > 0'
     }
 
-    return calculateHpp(params)
-  }, [watchedValues, selectedBuah, isKemarau])
+    if (item.hargaBeli <= 0) errors.hargaBeli = 'Harga beli harus diisi'
+
+    const hpp = computeItemHpp(item)
+    if (hpp && hpp.netYield <= 0) {
+      errors.hpp = 'Net Yield <= 0: periksa data berat dan parameter musim'
+    }
+
+    return errors
+  }
 
   // ============================================================
-  // SUBMIT HANDLER
+  // SIMPAN SEMUA ITEM
   // ============================================================
-  async function onSubmit(values: PembelianFormValues) {
-    if (!hppResult || !hppResult.isValid) {
-      toast.error('Perbaiki error kalkulasi sebelum menyimpan')
+  async function handleSave() {
+    if (!pemasokId) {
+      setPemasokError('Pilih pemasok')
       return
     }
-    if (hppResult.netYield <= 0) {
-      toast.error('Net Yield ≤ 0. Periksa data berat bruto dan parameter musim.')
+    setPemasokError('')
+
+    let hasError = false
+    const validatedItems = items.map(item => {
+      const errors = validateItem(item)
+      if (Object.keys(errors).length > 0) hasError = true
+      return { ...item, errors }
+    })
+    setItems(validatedItems)
+    if (hasError) {
+      toast.error('Perbaiki error di form sebelum menyimpan')
       return
     }
 
     setIsSaving(true)
-    const jumlah = values.jumlah_peti
-    const beratBrutoTotal      = values.berat_bruto_per_kemasan * jumlah
-    const biayaTransportPerPeti = jumlah > 0 ? values.biaya_transport_borongan / jumlah : 0
+    try {
+      const insertPromises = validatedItems.map(item => {
+        const buah     = getItemBuah(item)!
+        const satuan   = getItemSatuan(item)
+        const isKgMode = satuan === 'kg'
+        const jumlah   = parseFloat(item.jumlah) || 0
+        const beratBrutoPerKemasan  = isKgMode ? 1 : (parseFloat(item.beratBruto) || 0)
+        const beratBrutoTotal       = beratBrutoPerKemasan * jumlah
+        const biayaTransportPerPeti = jumlah > 0 ? item.transport / jumlah : 0
+        const hpp = computeItemHpp(item)!
 
-    const { error } = await supabase.from('pembelian').insert({
-      tanggal:                  values.tanggal,
-      buah_id:                  values.buah_id,
-      pemasok_id:               values.pemasok_id,
-      musim,
-      jumlah_peti:              jumlah,
-      harga_beli_per_peti:      values.harga_beli_per_peti,
-      berat_bruto_total:        beratBrutoTotal,
-      biaya_transport_per_peti: biayaTransportPerPeti,
-      total_biaya_regu_sortir:  values.total_biaya_regu_sortir,
-      nilai_recovery_afkir:     values.nilai_recovery_afkir,
-      // Simpan snapshot kalkulasi untuk audit
-      snap_berat_peti_used:     isKemarau ? selectedBuah!.berat_peti_kemarau : selectedBuah!.berat_peti_hujan,
-      snap_pct_afkir_used:      isKemarau ? selectedBuah!.pct_afkir_kemarau : selectedBuah!.pct_afkir_hujan,
-      landed_cost:              hppResult.totalLandedCost,
-      berat_afkir:              hppResult.beratAfkir,
-      net_yield:                hppResult.netYield,
-      biaya_kuli_sortir_per_kg: hppResult.biayaKuliSortirPerKg,
-      hpp_per_kg:               hppResult.hppPerKg,
-      catatan:                  values.catatan || null,
-    })
-
-    if (error) {
-      toast.error('Gagal menyimpan: ' + error.message)
-    } else {
-      toast.success('Transaksi pembelian berhasil disimpan')
-      form.reset({
-        ...form.getValues(),
-        buah_id: '', pemasok_id: '',
-        jumlah_peti: 1, harga_beli_per_peti: 0, berat_bruto_per_kemasan: 0,
-        biaya_transport_borongan: 0, total_biaya_regu_sortir: 0,
-        nilai_recovery_afkir: 0, catatan: '',
+        return supabase.from('pembelian').insert({
+          tanggal,
+          buah_id:                  item.buahId,
+          pemasok_id:               pemasokId,
+          musim,
+          jumlah_peti:              jumlah,
+          harga_beli_per_peti:      item.hargaBeli,
+          berat_bruto_total:        beratBrutoTotal,
+          biaya_transport_per_peti: biayaTransportPerPeti,
+          total_biaya_regu_sortir:  item.sortir,
+          nilai_recovery_afkir:     item.recovery,
+          snap_berat_peti_used:     isKgMode ? 0 : (isKemarau ? buah.berat_peti_kemarau : buah.berat_peti_hujan),
+          snap_pct_afkir_used:      isKemarau ? buah.pct_afkir_kemarau : buah.pct_afkir_hujan,
+          landed_cost:              hpp.totalLandedCost,
+          berat_afkir:              hpp.beratAfkir,
+          net_yield:                hpp.netYield,
+          biaya_kuli_sortir_per_kg: hpp.biayaKuliSortirPerKg,
+          hpp_per_kg:               hpp.hppPerKg,
+          catatan:                  item.catatan || null,
+        })
       })
-      setHargaBeliVal(0); setTransportVal(0); setSortirVal(0); setRecoveryVal(0)
-      setSatuanOverride(null)
+
+      const results  = await Promise.all(insertPromises)
+      const failures = results.filter(r => r.error)
+
+      if (failures.length > 0) {
+        toast.error(`${failures.length} item gagal disimpan: ${failures[0].error?.message}`)
+      } else {
+        toast.success(
+          items.length > 1
+            ? `${items.length} transaksi pembelian berhasil disimpan`
+            : 'Transaksi pembelian berhasil disimpan'
+        )
+        setItems([emptyItem()])
+      }
+    } catch {
+      toast.error('Terjadi kesalahan saat menyimpan')
+    } finally {
+      setIsSaving(false)
     }
-    setIsSaving(false)
   }
 
   // ============================================================
   // RENDER
   // ============================================================
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      {/* === FORM KIRI === */}
-      <div className="lg:col-span-2">
-        <Card>
-          <CardHeader>
+    <div className="space-y-4">
+
+      {/* ===== HEADER: Tanggal + Pemasok (shared) ===== */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Form Pembelian Baru</CardTitle>
-            <CardDescription>
+            <CardDescription className="flex items-center gap-1.5">
               Musim aktif:{' '}
               <Badge
                 variant="outline"
@@ -229,320 +289,454 @@ export default function InputPembelianPage() {
                     : 'border-blue-300 text-blue-700 bg-blue-50'
                 )}
               >
-                {isKemarau ? <Sun className="mr-1 h-3 w-3 inline" /> : <CloudRain className="mr-1 h-3 w-3 inline" />}
+                {isKemarau
+                  ? <Sun className="mr-1 h-3 w-3 inline" />
+                  : <CloudRain className="mr-1 h-3 w-3 inline" />}
                 {isKemarau ? 'Kemarau' : 'Hujan'}
               </Badge>
-              {' '}— Parameter buah akan menyesuaikan musim ini
+              {' '}&mdash; Parameter buah akan menyesuaikan musim ini
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              {/* Baris 1: Tanggal */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label>Tanggal <span className="text-red-500">*</span></Label>
-                  <Input type="date" {...form.register('tanggal')} />
-                </div>
-              </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label>Tanggal <span className="text-red-500">*</span></Label>
+              <Input
+                type="date"
+                value={tanggal}
+                onChange={e => setTanggal(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Pemasok <span className="text-red-500">*</span></Label>
+              <Select
+                value={pemasokId}
+                onValueChange={v => { setPemasokId(v ?? ''); setPemasokError('') }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih pemasok...">
+                    {pemasokList.find(p => p.id === pemasokId)?.nama ?? null}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  {pemasokList.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.nama}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {pemasokError && <p className="text-xs text-red-500">{pemasokError}</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-              {/* Baris 2: Buah + Pemasok — 2 kolom lebar agar dropdown tidak bertabrakan */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Buah <span className="text-red-500">*</span></Label>
-                  <Select
-                    onValueChange={(v) => form.setValue('buah_id', v ?? '', { shouldValidate: true })}
-                    value={form.watch('buah_id')}
+      {/* ===== DAFTAR ITEM ===== */}
+      {items.map((item, index) => {
+        const buah        = getItemBuah(item)
+        const satuan      = getItemSatuan(item)
+        const isKgMode    = satuan === 'kg'
+        const satuanLabel = satuan.charAt(0).toUpperCase() + satuan.slice(1)
+        const hpp         = buah ? computeItemHpp(item) : null
+        const jumlahNum   = parseFloat(item.jumlah) || 0
+        const beratBrutoNum = parseFloat(item.beratBruto) || 0
+        const hasErrors   = Object.values(item.errors).some(v => v)
+
+        return (
+          <Card
+            key={item.key}
+            className={cn('border-2', hasErrors ? 'border-red-200' : 'border-transparent')}
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Buah #{index + 1}
+                </CardTitle>
+                {items.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeItem(item.key)}
+                    className="h-7 gap-1 text-red-500 hover:text-red-700 hover:bg-red-50"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih buah...">
-                        {buahList.find(b => b.id === form.watch('buah_id'))?.nama ?? null}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {buahList.map(b => (
-                        <SelectItem key={b.id} value={b.id}>{b.nama}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.buah_id && (
-                    <p className="text-xs text-red-500">{form.formState.errors.buah_id.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Pemasok <span className="text-red-500">*</span></Label>
-                  <Select
-                    onValueChange={(v) => form.setValue('pemasok_id', v ?? '', { shouldValidate: true })}
-                    value={form.watch('pemasok_id')}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih pemasok...">
-                        {pemasokList.find(p => p.id === form.watch('pemasok_id'))?.nama ?? null}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {pemasokList.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.nama}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.pemasok_id && (
-                    <p className="text-xs text-red-500">{form.formState.errors.pemasok_id.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Baris 2: Data Fisik Peti */}
-              <div>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Data Fisik
-                </p>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {/* Satuan Kemasan — override manual */}
-                  <div className="space-y-1.5 col-span-2 sm:col-span-3">
-                    <Label>Satuan Kemasan</Label>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={satuanRaw}
-                        onValueChange={(v) => setSatuanOverride(v)}
-                      >
-                        <SelectTrigger className="w-36">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent alignItemWithTrigger={false}>
-                          {SATUAN_OPTIONS.map(o => (
-                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {selectedBuah && selectedBuah.satuan && satuanOverride && satuanOverride !== selectedBuah.satuan && (
-                        <span className="text-xs text-amber-600">
-                          Default dari master: <strong>{selectedBuah.satuan}</strong> — sedang di-override
-                        </span>
-                      )}
-                      {(!satuanOverride || (selectedBuah && satuanOverride === selectedBuah.satuan)) && selectedBuah?.satuan && (
-                        <span className="text-xs text-muted-foreground">Dari master buah</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label>Jumlah {satuanLabel}</Label>
-                    <Input type="number" min="0.1" step="0.1" {...form.register('jumlah_peti', { valueAsNumber: true })} />
-                    {form.formState.errors.jumlah_peti && (
-                      <p className="text-xs text-red-500">{form.formState.errors.jumlah_peti.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Berat Bruto per {satuanLabel} (kg)</Label>
-                    <Input type="number" min="0" step="0.1" placeholder="contoh: 6.5" {...form.register('berat_bruto_per_kemasan', { valueAsNumber: true })} />
-                    {form.formState.errors.berat_bruto_per_kemasan && (
-                      <p className="text-xs text-red-500">{form.formState.errors.berat_bruto_per_kemasan.message}</p>
-                    )}
-                    {/* Auto-total preview */}
-                    {(form.watch('berat_bruto_per_kemasan') || 0) > 0 && (form.watch('jumlah_peti') || 0) > 0 && (
-                      <p className="text-xs text-primary font-medium">
-                        Total: {((form.watch('berat_bruto_per_kemasan') || 0) * (form.watch('jumlah_peti') || 0)).toFixed(2)} kg
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                    <Label className="text-muted-foreground text-xs block">
-                      Parameter Musim Aktif{' '}
-                      {selectedBuah && (
-                        <span className="font-medium text-foreground">
-                          ({isKemarau ? selectedBuah.berat_peti_kemarau : selectedBuah.berat_peti_hujan} kg/{satuanLabel.toLowerCase()},{' '}
-                          {isKemarau ? selectedBuah.pct_afkir_kemarau : selectedBuah.pct_afkir_hujan}% afkir)
-                        </span>
-                      )}
-                    </Label>
-                    <div className={cn(
-                      'flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground',
-                      isKemarau ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'
-                    )}>
-                      {selectedBuah ? 'Otomatis dari master buah' : 'Pilih buah dulu'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Baris 3: Data Biaya */}
-              <div>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Data Biaya (Rp)
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Harga Beli per {satuanLabel} (Rp)</Label>
-                    <RupiahInput
-                      value={hargaBeliVal}
-                      onChange={(v) => { setHargaBeliVal(v); form.setValue('harga_beli_per_peti', v, { shouldValidate: true }) }}
-                      placeholder="Contoh: 150.000"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Biaya Angkut / Transport Borongan (Rp)</Label>
-                    <RupiahInput
-                      value={transportVal}
-                      onChange={(v) => { setTransportVal(v); form.setValue('biaya_transport_borongan', v, { shouldValidate: true }) }}
-                      placeholder="Contoh: 300.000"
-                    />
-                    <p className="text-xs text-muted-foreground">Total 1 trip: BBM + sopir + retribusi</p>
-                    {(form.watch('biaya_transport_borongan') || 0) > 0 && (form.watch('jumlah_peti') || 0) > 0 && (
-                      <p className="text-xs text-primary font-medium">
-                        = {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(
-                            (form.watch('biaya_transport_borongan') || 0) / (form.watch('jumlah_peti') || 1)
-                          )} / {satuanLabel.toLowerCase()}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Total Biaya Regu Sortir (Rp)</Label>
-                    <RupiahInput
-                      value={sortirVal}
-                      onChange={(v) => { setSortirVal(v); form.setValue('total_biaya_regu_sortir', v, { shouldValidate: true }) }}
-                      placeholder="Contoh: 50.000"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Nilai Recovery Buah Afkir (Rp)</Label>
-                    <RupiahInput
-                      value={recoveryVal}
-                      onChange={(v) => { setRecoveryVal(v); form.setValue('nilai_recovery_afkir', v, { shouldValidate: true }) }}
-                      placeholder="Contoh: 20.000"
-                    />
-                    <p className="text-xs text-muted-foreground">Pendapatan dari jual buah afkir/rusak</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Catatan</Label>
-                <Input placeholder="Catatan tambahan..." {...form.register('catatan')} />
-              </div>
-
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isSaving || !hppResult?.isValid} className="min-w-32">
-                  {isSaving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                  Simpan Transaksi
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* === PREVIEW CARD KANAN === */}
-      <div className="space-y-4">
-        <Card className={cn(
-          'sticky top-6 border-2',
-          !hppResult ? 'border-dashed' :
-          hppResult.isValid ? 'border-green-300' : 'border-red-300'
-        )}>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Calculator className="h-4 w-4" />
-              Live Preview HPP
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Kalkulasi otomatis berdasarkan input Anda
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!selectedBuah ? (
-              <p className="text-sm text-center text-muted-foreground py-4">
-                Pilih buah untuk melihat kalkulasi HPP
-              </p>
-            ) : !hppResult ? null : (
-              <>
-                {/* Error state */}
-                {!hppResult.isValid && hppResult.validationErrors.length > 0 && (
-                  <div className="rounded-md bg-red-50 border border-red-200 p-3 space-y-1">
-                    {hppResult.validationErrors.map((err, i) => (
-                      <p key={i} className="text-xs text-red-600 flex items-start gap-1">
-                        <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        {err}
-                      </p>
-                    ))}
-                  </div>
+                    <Trash2 className="h-3.5 w-3.5" /> Hapus
+                  </Button>
                 )}
+              </div>
+            </CardHeader>
 
-                {/* Breakdown Kalkulasi */}
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Landed Cost/{satuanLabel}</span>
-                    <span className="font-medium">{formatRupiahFull(hppResult.landedCostPerPeti)}</span>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+                {/* ---- FORM FIELDS (2/3) ---- */}
+                <div className="lg:col-span-2 space-y-5">
+
+                  {/* Pilih Buah */}
+                  <div className="space-y-1.5">
+                    <Label>Buah <span className="text-red-500">*</span></Label>
+                    <Select
+                      value={item.buahId}
+                      onValueChange={v => {
+                        const newErrors = { ...item.errors }
+                        delete newErrors.buahId
+                        updateItem(item.key, { buahId: v ?? '', satuanOverride: undefined, errors: newErrors })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih buah...">
+                          {buahList.find(b => b.id === item.buahId)?.nama ?? null}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false}>
+                        {buahList.map(b => (
+                          <SelectItem key={b.id} value={b.id}>{b.nama}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {item.errors.buahId && (
+                      <p className="text-xs text-red-500">{item.errors.buahId}</p>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Landed Cost</span>
-                    <span className="font-medium">{formatRupiahFull(hppResult.totalLandedCost)}</span>
-                  </div>
+
                   <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Berat Tara {satuanLabel} Total</span>
-                    <span>{formatKg(hppResult.beratPetiTotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Berat Afkir</span>
-                    <span className="text-amber-600">- {formatKg(hppResult.beratAfkir)}</span>
-                  </div>
-                  <div className="flex justify-between font-medium">
-                    <span>Net Yield (Jual)</span>
-                    <span className={cn(
-                      hppResult.netYield > 0 ? 'text-green-600' : 'text-red-600'
-                    )}>
-                      {formatKg(hppResult.netYield)}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Biaya Kuli/Kg</span>
-                    <span>{formatRupiahFull(hppResult.biayaKuliSortirPerKg)}</span>
-                  </div>
-                </div>
 
-                <Separator />
-
-                {/* RESULT UTAMA */}
-                <div className={cn(
-                  'rounded-lg p-3 text-center',
-                  hppResult.isValid && hppResult.netYield > 0
-                    ? 'bg-green-50 border border-green-200'
-                    : 'bg-red-50 border border-red-200'
-                )}>
-                  <p className="text-xs text-muted-foreground mb-1">True HPP per Kg</p>
-                  <p className={cn(
-                    'text-2xl font-bold',
-                    hppResult.isValid && hppResult.netYield > 0 ? 'text-green-700' : 'text-red-600'
-                  )}>
-                    {formatRupiahFull(hppResult.hppPerKg)}
-                  </p>
-                  {hppResult.isValid && !hppResult.validationErrors.length && (
-                    <p className="text-xs text-green-600 mt-1 flex items-center justify-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Siap disimpan
+                  {/* DATA FISIK */}
+                  <div>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Data Fisik
                     </p>
+                    <div className="grid grid-cols-2 gap-4">
+
+                      {/* Satuan Kemasan */}
+                      <div className="space-y-1.5 col-span-2">
+                        <Label>Satuan Kemasan</Label>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={satuan}
+                            onValueChange={v => updateItem(item.key, { satuanOverride: v ?? undefined })}
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent alignItemWithTrigger={false}>
+                              {SATUAN_OPTIONS.map(o => (
+                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {buah && item.satuanOverride && item.satuanOverride !== buah.satuan && (
+                            <span className="text-xs text-amber-600">
+                              Default: <strong>{buah.satuan}</strong> &mdash; sedang di-override
+                            </span>
+                          )}
+                          {(!item.satuanOverride || (buah && item.satuanOverride === buah.satuan)) && buah?.satuan && (
+                            <span className="text-xs text-muted-foreground">Dari master buah</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Jumlah */}
+                      <div className="space-y-1.5">
+                        <Label>Jumlah {satuanLabel} <span className="text-red-500">*</span></Label>
+                        <Input
+                          type="number" min="0.1" step="0.1"
+                          value={item.jumlah}
+                          onChange={e => {
+                            const newErrors = { ...item.errors }
+                            delete newErrors.jumlah
+                            updateItem(item.key, { jumlah: e.target.value, errors: newErrors })
+                          }}
+                        />
+                        {item.errors.jumlah && (
+                          <p className="text-xs text-red-500">{item.errors.jumlah}</p>
+                        )}
+                        {isKgMode && jumlahNum > 0 && (
+                          <p className="text-xs text-primary font-medium">
+                            Total berat bruto: {jumlahNum.toFixed(2)} kg
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Berat Bruto per Kemasan - DISEMBUNYIKAN saat satuan=kg */}
+                      {!isKgMode && (
+                        <div className="space-y-1.5">
+                          <Label>Berat Bruto per {satuanLabel} (kg) <span className="text-red-500">*</span></Label>
+                          <Input
+                            type="number" min="0" step="0.1" placeholder="contoh: 6.5"
+                            value={item.beratBruto}
+                            onChange={e => {
+                              const newErrors = { ...item.errors }
+                              delete newErrors.beratBruto
+                              updateItem(item.key, { beratBruto: e.target.value, errors: newErrors })
+                            }}
+                          />
+                          {item.errors.beratBruto && (
+                            <p className="text-xs text-red-500">{item.errors.beratBruto}</p>
+                          )}
+                          {beratBrutoNum > 0 && jumlahNum > 0 && (
+                            <p className="text-xs text-primary font-medium">
+                              Total: {(beratBrutoNum * jumlahNum).toFixed(2)} kg
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Pcs per Kg - HANYA saat satuan=kg, opsional */}
+                      {isKgMode && (
+                        <div className="space-y-1.5">
+                          <Label>
+                            Pcs per Kg{' '}
+                            <span className="text-xs font-normal text-muted-foreground">(opsional)</span>
+                          </Label>
+                          <Input
+                            type="number" min="0" step="0.1" placeholder="contoh: 8"
+                            value={item.pcsPerKg}
+                            onChange={e => updateItem(item.key, { pcsPerKg: e.target.value })}
+                          />
+                          {hpp && hpp.totalPcs !== null && (
+                            <p className="text-xs text-primary font-medium">
+                              approx {hpp.totalPcs.toLocaleString('id-ID')} pcs dari {formatKg(hpp.netYield)} net yield
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Info parameter musim */}
+                      {buah && (
+                        <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Parameter Musim Aktif{' '}
+                            <span className="font-medium text-foreground">
+                              {isKgMode
+                                ? `(${formatPersen(isKemarau ? buah.pct_afkir_kemarau : buah.pct_afkir_hujan)} afkir, tanpa tara kemasan)`
+                                : `(${isKemarau ? buah.berat_peti_kemarau : buah.berat_peti_hujan} kg/${satuan}, ${formatPersen(isKemarau ? buah.pct_afkir_kemarau : buah.pct_afkir_hujan)} afkir)`
+                              }
+                            </span>
+                          </Label>
+                          <div className={cn(
+                            'flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground',
+                            isKemarau ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'
+                          )}>
+                            Otomatis dari master buah
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* DATA BIAYA */}
+                  <div>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Data Biaya (Rp)
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>Harga Beli per {satuanLabel} (Rp) <span className="text-red-500">*</span></Label>
+                        <RupiahInput
+                          value={item.hargaBeli}
+                          onChange={v => {
+                            const newErrors = { ...item.errors }
+                            delete newErrors.hargaBeli
+                            updateItem(item.key, { hargaBeli: v, errors: newErrors })
+                          }}
+                          placeholder="Contoh: 150.000"
+                        />
+                        {item.errors.hargaBeli && (
+                          <p className="text-xs text-red-500">{item.errors.hargaBeli}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Biaya Angkut / Transport Borongan (Rp)</Label>
+                        <RupiahInput
+                          value={item.transport}
+                          onChange={v => updateItem(item.key, { transport: v })}
+                          placeholder="Contoh: 300.000"
+                        />
+                        <p className="text-xs text-muted-foreground">Total 1 trip: BBM + sopir + retribusi</p>
+                        {item.transport > 0 && jumlahNum > 0 && (
+                          <p className="text-xs text-primary font-medium">
+                            = {new Intl.NumberFormat('id-ID', {
+                              style: 'currency', currency: 'IDR', maximumFractionDigits: 0,
+                            }).format(item.transport / jumlahNum)} / {satuan}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Total Biaya Regu Sortir (Rp)</Label>
+                        <RupiahInput
+                          value={item.sortir}
+                          onChange={v => updateItem(item.key, { sortir: v })}
+                          placeholder="Contoh: 50.000"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Nilai Recovery Buah Afkir (Rp)</Label>
+                        <RupiahInput
+                          value={item.recovery}
+                          onChange={v => updateItem(item.key, { recovery: v })}
+                          placeholder="Contoh: 20.000"
+                        />
+                        <p className="text-xs text-muted-foreground">Pendapatan dari jual buah afkir/rusak</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Catatan</Label>
+                    <Input
+                      placeholder="Catatan tambahan..."
+                      value={item.catatan}
+                      onChange={e => updateItem(item.key, { catatan: e.target.value })}
+                    />
+                  </div>
+
+                  {item.errors.hpp && (
+                    <div className="rounded-md bg-red-50 border border-red-200 p-2">
+                      <p className="text-xs text-red-600 flex items-start gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                        {item.errors.hpp}
+                      </p>
+                    </div>
                   )}
                 </div>
 
-                {/* Info musim */}
-                <div className={cn(
-                  'rounded-md p-2 text-xs flex items-center gap-2',
-                  isKemarau ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
-                )}>
-                  {isKemarau ? <Sun className="h-3 w-3" /> : <CloudRain className="h-3 w-3" />}
-                  <span>
-                    Menggunakan parameter {isKemarau ? 'Kemarau' : 'Hujan'}:{' '}
-                    {formatKg(isKemarau ? selectedBuah.berat_peti_kemarau : selectedBuah.berat_peti_hujan)}/{satuanLabel.toLowerCase()},{' '}
-                    {formatPersen(isKemarau ? selectedBuah.pct_afkir_kemarau : selectedBuah.pct_afkir_hujan)} afkir
-                  </span>
+                {/* ---- PREVIEW HPP (1/3) ---- */}
+                <div>
+                  <Card className={cn(
+                    'sticky top-6 border',
+                    !hpp           ? 'border-dashed' :
+                    hpp.isValid && hpp.netYield > 0 ? 'border-green-300' : 'border-red-300'
+                  )}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-1.5 text-xs">
+                        <Calculator className="h-3.5 w-3.5" />
+                        Live Preview HPP
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {!buah ? (
+                        <p className="py-3 text-center text-xs text-muted-foreground">
+                          Pilih buah untuk kalkulasi
+                        </p>
+                      ) : !hpp ? null : (
+                        <>
+                          {hpp.validationErrors.length > 0 && (
+                            <div className="rounded-md bg-red-50 border border-red-200 p-2 space-y-1">
+                              {hpp.validationErrors.map((err, i) => (
+                                <p key={i} className="text-xs text-red-600 flex items-start gap-1">
+                                  <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                  {err}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Landed Cost/{satuanLabel}</span>
+                              <span className="font-medium">{formatRupiahFull(hpp.landedCostPerPeti)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Landed Cost</span>
+                              <span className="font-medium">{formatRupiahFull(hpp.totalLandedCost)}</span>
+                            </div>
+                            <Separator />
+                            {!isKgMode && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Berat Tara {satuanLabel} Total</span>
+                                <span>{formatKg(hpp.beratPetiTotal)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Berat Afkir</span>
+                              <span className="text-amber-600">- {formatKg(hpp.beratAfkir)}</span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                              <span>Net Yield (Jual)</span>
+                              <span className={cn(
+                                hpp.netYield > 0 ? 'text-green-600' : 'text-red-600'
+                              )}>
+                                {formatKg(hpp.netYield)}
+                              </span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Biaya Kuli/Kg</span>
+                              <span>{formatRupiahFull(hpp.biayaKuliSortirPerKg)}</span>
+                            </div>
+                          </div>
+
+                          <div className={cn(
+                            'rounded-lg p-2.5 text-center',
+                            hpp.isValid && hpp.netYield > 0
+                              ? 'bg-green-50 border border-green-200'
+                              : 'bg-red-50 border border-red-200'
+                          )}>
+                            <p className="text-xs text-muted-foreground mb-0.5">True HPP per Kg</p>
+                            <p className={cn(
+                              'text-2xl font-bold',
+                              hpp.isValid && hpp.netYield > 0 ? 'text-green-700' : 'text-red-600'
+                            )}>
+                              {formatRupiahFull(hpp.hppPerKg)}
+                            </p>
+                          </div>
+
+                          {isKgMode && hpp.totalPcs !== null && (
+                            <p className="text-center text-xs text-primary font-medium">
+                              approx {hpp.totalPcs.toLocaleString('id-ID')} pcs total
+                            </p>
+                          )}
+
+                          <div className={cn(
+                            'rounded-md p-1.5 text-xs flex items-center gap-1.5',
+                            isKemarau ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
+                          )}>
+                            {isKemarau ? <Sun className="h-3 w-3 shrink-0" /> : <CloudRain className="h-3 w-3 shrink-0" />}
+                            <span>
+                              {isKemarau ? 'Kemarau' : 'Hujan'}
+                              {isKgMode
+                                ? ''
+                                : `: ${formatKg(isKemarau ? buah.berat_peti_kemarau : buah.berat_peti_hujan)}/${satuan}`
+                              },{' '}
+                              {formatPersen(isKemarau ? buah.pct_afkir_kemarau : buah.pct_afkir_hujan)} afkir
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
+
+      {/* ===== TOMBOL AKSI ===== */}
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={addItem}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Tambah Buah Lain
+        </Button>
+
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="min-w-40"
+        >
+          {isSaving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+          {items.length > 1 ? `Simpan ${items.length} Buah` : 'Simpan Transaksi'}
+        </Button>
       </div>
     </div>
   )
