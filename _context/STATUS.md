@@ -1,7 +1,7 @@
 # Surga Buah — Status Pengembangan
 
 > Update terakhir: April 2026
-> Last commit: `pending` — feat: kas_masuk, kas_keluar, laporan-cashflow, sidebar Keuangan
+> Last commit: `fdeb264` — feat: modul keuangan - kas_masuk, kas_keluar, laporan-cashflow + sidebar Keuangan
 
 ---
 
@@ -29,11 +29,11 @@
 | Sidebar: Input Sortir + Retur Pemasok | `a735b1c` | — |
 | Jurnal Penjualan: kolom Tipe (Normal/Reject badge) | `a735b1c` | — |
 | schema.sql: fix idempotent (ADD COLUMN IF NOT EXISTS + DO $$ guards) | `a735b1c` | — |
-| Kas Masuk (halaman baru: input modal & pemasukan non-buah) | `pending` | — |
-| Kas Keluar (halaman baru: input pengeluaran operasional) | `pending` | — |
-| Laporan Cashflow (dashboard cashflow + indikator kesehatan usaha) | `pending` | — |
-| Sidebar: seksi Keuangan (Kas Masuk, Kas Keluar, Laporan Cashflow) | `pending` | — |
-| schema.sql: tabel kas_masuk + kas_keluar | `pending` | Perlu dijalankan di Supabase |
+| Kas Masuk (halaman baru: input modal & pemasukan non-buah) | `fdeb264` | — |
+| Kas Keluar (halaman baru: input pengeluaran operasional) | `fdeb264` | — |
+| Laporan Cashflow (dashboard cashflow + indikator kesehatan usaha) | `fdeb264` | — |
+| Sidebar: seksi Keuangan (Kas Masuk, Kas Keluar, Laporan Cashflow) | `fdeb264` | — |
+| schema.sql: tabel kas_masuk + kas_keluar | `fdeb264` | Perlu dijalankan di Supabase |
 
 ---
 

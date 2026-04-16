@@ -11,6 +11,7 @@ import type { BuahRow, PelangganRow, TipePelanggan } from '@/types/database.type
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RupiahInput } from '@/components/ui/rupiah-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +54,7 @@ export default function InputPenjualanPage() {
   const [spareMode, setSpareMode]         = useState<'pct' | 'kg' | 'pcs'>('pct')
   const [spareRaw, setSpareRaw]           = useState('')
   const [tipeJual, setTipeJual]           = useState<'normal' | 'reject'>('normal')
+  const [hargaJualVal, setHargaJualVal]   = useState(0)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -177,6 +179,7 @@ export default function InputPenjualanPage() {
       setSpareRaw('')
       setSpareMode('pct')
       setTipeJual('normal')
+      setHargaJualVal(0)
     }
     setIsSaving(false)
   }
@@ -274,10 +277,10 @@ export default function InputPenjualanPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Harga Jual per Kg (Rp) <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="number" min="0" step="100"
-                      placeholder="0"
-                      {...form.register('harga_jual_per_kg', { valueAsNumber: true })}
+                    <RupiahInput
+                      value={hargaJualVal}
+                      onChange={(v) => { setHargaJualVal(v); form.setValue('harga_jual_per_kg', v, { shouldValidate: true }) }}
+                      placeholder="Contoh: 15.000"
                     />
                     {/* Hint HPP */}
                     {preview.hpp !== null && (

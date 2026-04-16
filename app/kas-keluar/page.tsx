@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatRupiahFull } from '@/lib/calculations/hpp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RupiahInput } from '@/components/ui/rupiah-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -68,6 +69,9 @@ export default function KasKeluarPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // State lokal untuk field Rupiah
+  const [jumlahVal, setJumlahVal] = useState(0)
+
   async function onSubmit(values: KasFormValues) {
     setIsSaving(true)
     const { error } = await supabase.from('kas_keluar').insert({
@@ -82,6 +86,7 @@ export default function KasKeluarPage() {
     } else {
       toast.success('Kas keluar berhasil dicatat')
       form.reset({ tanggal: today, kategori: '', jumlah: 0, deskripsi: '', catatan: '' })
+      setJumlahVal(0)
       fetchData()
     }
     setIsSaving(false)
@@ -165,9 +170,10 @@ export default function KasKeluarPage() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Jumlah (Rp) <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="number" min="1" step="1000" placeholder="0"
-                      {...form.register('jumlah', { valueAsNumber: true })}
+                    <RupiahInput
+                      value={jumlahVal}
+                      onChange={(v) => { setJumlahVal(v); form.setValue('jumlah', v, { shouldValidate: true }) }}
+                      placeholder="Contoh: 2.500.000"
                     />
                     {form.formState.errors.jumlah && (
                       <p className="text-xs text-red-500">{form.formState.errors.jumlah.message}</p>

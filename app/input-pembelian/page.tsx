@@ -12,6 +12,7 @@ import type { BuahRow, PemasokRow } from '@/types/database.types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RupiahInput } from '@/components/ui/rupiah-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +51,12 @@ export default function InputPembelianPage() {
   const [pemasokList, setPemasokList]   = useState<PemasokRow[]>([])
   const [selectedBuah, setSelectedBuah] = useState<BuahRow | null>(null)
   const [isSaving, setIsSaving]         = useState(false)
+
+  // State lokal Rupiah fields (untuk format pemisah ribuan)
+  const [hargaBeliVal,     setHargaBeliVal]     = useState(0)
+  const [transportVal,     setTransportVal]     = useState(0)
+  const [sortirVal,        setSortirVal]        = useState(0)
+  const [recoveryVal,      setRecoveryVal]      = useState(0)
 
   // Satuan label dinamis dari master buah
   const satuanLabel = selectedBuah?.satuan
@@ -319,11 +326,19 @@ export default function InputPembelianPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>Harga Beli per {satuanLabel} (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('harga_beli_per_peti', { valueAsNumber: true })} />
+                    <RupiahInput
+                      value={hargaBeliVal}
+                      onChange={(v) => { setHargaBeliVal(v); form.setValue('harga_beli_per_peti', v, { shouldValidate: true }) }}
+                      placeholder="Contoh: 150.000"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Biaya Angkut / Transport Borongan (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('biaya_transport_borongan', { valueAsNumber: true })} />
+                    <RupiahInput
+                      value={transportVal}
+                      onChange={(v) => { setTransportVal(v); form.setValue('biaya_transport_borongan', v, { shouldValidate: true }) }}
+                      placeholder="Contoh: 300.000"
+                    />
                     <p className="text-xs text-muted-foreground">Total 1 trip: BBM + sopir + retribusi</p>
                     {(form.watch('biaya_transport_borongan') || 0) > 0 && (form.watch('jumlah_peti') || 0) > 0 && (
                       <p className="text-xs text-primary font-medium">
@@ -335,11 +350,19 @@ export default function InputPembelianPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Total Biaya Regu Sortir (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('total_biaya_regu_sortir', { valueAsNumber: true })} />
+                    <RupiahInput
+                      value={sortirVal}
+                      onChange={(v) => { setSortirVal(v); form.setValue('total_biaya_regu_sortir', v, { shouldValidate: true }) }}
+                      placeholder="Contoh: 50.000"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Nilai Recovery Buah Afkir (Rp)</Label>
-                    <Input type="number" min="0" step="1000" {...form.register('nilai_recovery_afkir', { valueAsNumber: true })} />
+                    <RupiahInput
+                      value={recoveryVal}
+                      onChange={(v) => { setRecoveryVal(v); form.setValue('nilai_recovery_afkir', v, { shouldValidate: true }) }}
+                      placeholder="Contoh: 20.000"
+                    />
                     <p className="text-xs text-muted-foreground">Pendapatan dari jual buah afkir/rusak</p>
                   </div>
                 </div>

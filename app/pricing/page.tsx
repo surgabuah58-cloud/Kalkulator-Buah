@@ -331,7 +331,7 @@ export default function PricingPage() {
                         <Input
                           type="number"
                           min="0"
-                          step="500"
+                          step="any"
                           className="h-8 text-sm w-full"
                           value={state?.harga_mentok_pasar ?? ''}
                           placeholder="0"
@@ -344,7 +344,7 @@ export default function PricingPage() {
                         <Input
                           type="number"
                           min="0"
-                          step="500"
+                          step="any"
                           className={cn(
                             'h-8 text-sm w-full',
                             validation?.statusDapur === 'error' && 'border-red-400 focus-visible:ring-red-400'
@@ -377,7 +377,7 @@ export default function PricingPage() {
                         <Input
                           type="number"
                           min="0"
-                          step="500"
+                          step="any"
                           className={cn(
                             'h-8 text-sm w-full',
                             validation?.statusSupplier === 'merah'  && 'border-red-400 focus-visible:ring-red-400',

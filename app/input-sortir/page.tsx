@@ -11,6 +11,7 @@ import type { PembelianRow } from '@/types/database.types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RupiahInput } from '@/components/ui/rupiah-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +54,7 @@ export default function InputSortirPage() {
 
   const [pembelianList, setPembelianList] = useState<PembelianOption[]>([])
   const [isSaving, setIsSaving]           = useState(false)
+  const [hargaRejectVal, setHargaRejectVal] = useState(0)
   const [isLoading, setIsLoading]         = useState(true)
 
   const today = new Date().toISOString().split('T')[0]
@@ -149,6 +151,7 @@ export default function InputSortirPage() {
         harga_jual_reject_per_kg: 0,
         catatan:                  '',
       })
+      setHargaRejectVal(0)
     }
     setIsSaving(false)
   }
@@ -310,10 +313,11 @@ export default function InputSortirPage() {
               {/* Harga Reject */}
               <div className="space-y-1.5">
                 <Label>Harga Jual Reject per kg (Rp) <span className="text-muted-foreground text-xs">(opsional)</span></Label>
-                <Input
-                  type="number" min="0" step="100" placeholder="0"
+                <RupiahInput
+                  value={hargaRejectVal}
+                  onChange={(v) => { setHargaRejectVal(v); form.setValue('harga_jual_reject_per_kg', v, { shouldValidate: true }) }}
+                  placeholder="Contoh: 5.000"
                   className="max-w-xs"
-                  {...form.register('harga_jual_reject_per_kg', { valueAsNumber: true })}
                 />
                 <p className="text-xs text-muted-foreground">Harga jual buah kelas reject dari batch ini</p>
               </div>

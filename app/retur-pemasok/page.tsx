@@ -11,6 +11,7 @@ import type { PembelianRow, ReturPemasokRow } from '@/types/database.types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RupiahInput } from '@/components/ui/rupiah-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -63,6 +64,7 @@ export default function ReturPemasokPage() {
   const [pembelianList, setPembelianList] = useState<PembelianOption[]>([])
   const [returList, setReturList]         = useState<ReturRow[]>([])
   const [isSaving, setIsSaving]           = useState(false)
+  const [hargaKreditVal, setHargaKreditVal] = useState(0)
   const [isLoadingPembelian, setIsLoadingPembelian] = useState(true)
   const [isLoadingRetur, setIsLoadingRetur]         = useState(true)
 
@@ -169,6 +171,7 @@ export default function ReturPemasokPage() {
         alasan:              '',
         catatan:             '',
       })
+      setHargaKreditVal(0)
       fetchRetur()
     }
     setIsSaving(false)
@@ -318,9 +321,10 @@ export default function ReturPemasokPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Harga Kredit per kg (Rp)</Label>
-                      <Input
-                        type="number" min="0" step="100" placeholder="0"
-                        {...form.register('harga_kredit_per_kg', { valueAsNumber: true })}
+                      <RupiahInput
+                        value={hargaKreditVal}
+                        onChange={(v) => { setHargaKreditVal(v); form.setValue('harga_kredit_per_kg', v, { shouldValidate: true }) }}
+                        placeholder="Contoh: 8.000"
                       />
                       <p className="text-xs text-muted-foreground">Harga kredit yang disepakati dengan pemasok</p>
                     </div>
