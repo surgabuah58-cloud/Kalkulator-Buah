@@ -18,6 +18,9 @@ import {
   Settings,
   SlidersHorizontal,
   Undo2,
+  Wallet,
+  ArrowUpCircle,
+  BarChart2,
 } from 'lucide-react'
 
 type NavItem = { href: string; label: string; icon: React.ElementType }
@@ -59,6 +62,14 @@ const navSections: NavSection[] = [
     items: [
       { href: '/kalkulator', label: 'Kalkulator HPP', icon: Calculator },
       { href: '/pricing',    label: 'Pricing Matrix', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Keuangan',
+    items: [
+      { href: '/kas-masuk',          label: 'Kas Masuk',          icon: Wallet },
+      { href: '/kas-keluar',         label: 'Kas Keluar',         icon: ArrowUpCircle },
+      { href: '/laporan-cashflow',   label: 'Laporan Cashflow',   icon: BarChart2 },
     ],
   },
   {

@@ -357,6 +357,68 @@ export interface Database {
         }
         Relationships: []
       }
+      kas_masuk: {
+        Row: {
+          id: string
+          tanggal: string
+          kategori: 'modal_awal' | 'injeksi_modal' | 'pinjaman' | 'lainnya'
+          jumlah: number
+          deskripsi: string
+          catatan: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tanggal?: string
+          kategori: 'modal_awal' | 'injeksi_modal' | 'pinjaman' | 'lainnya'
+          jumlah: number
+          deskripsi: string
+          catatan?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          tanggal?: string
+          kategori?: 'modal_awal' | 'injeksi_modal' | 'pinjaman' | 'lainnya'
+          jumlah?: number
+          deskripsi?: string
+          catatan?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kas_keluar: {
+        Row: {
+          id: string
+          tanggal: string
+          kategori: 'sewa' | 'listrik_air' | 'gaji' | 'alat' | 'barang_habis' | 'transport_ops' | 'lainnya'
+          jumlah: number
+          deskripsi: string
+          catatan: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tanggal?: string
+          kategori: 'sewa' | 'listrik_air' | 'gaji' | 'alat' | 'barang_habis' | 'transport_ops' | 'lainnya'
+          jumlah: number
+          deskripsi: string
+          catatan?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          tanggal?: string
+          kategori?: 'sewa' | 'listrik_air' | 'gaji' | 'alat' | 'barang_habis' | 'transport_ops' | 'lainnya'
+          jumlah?: number
+          deskripsi?: string
+          catatan?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pricing: {
         Row: {
           id: string
@@ -486,6 +548,12 @@ export type HasilSortirInsert = Database['public']['Tables']['hasil_sortir']['In
 
 export type ReturPemasokRow    = Database['public']['Tables']['retur_pemasok']['Row']
 export type ReturPemasokInsert = Database['public']['Tables']['retur_pemasok']['Insert']
+
+export type KasMasukRow    = Database['public']['Tables']['kas_masuk']['Row']
+export type KasMasukInsert = Database['public']['Tables']['kas_masuk']['Insert']
+
+export type KasKeluarRow    = Database['public']['Tables']['kas_keluar']['Row']
+export type KasKeluarInsert = Database['public']['Tables']['kas_keluar']['Insert']
 
 export type LatestHppRow     = Database['public']['Views']['v_latest_hpp']['Row']
 export type PricingMatrixRow = Database['public']['Views']['v_pricing_matrix']['Row']
