@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { TrendingUp, TrendingDown, Loader2, AlertTriangle, CheckCircle2, Plus, Trash2, Store } from 'lucide-react'
+import { TrendingUp, TrendingDown, Loader2, AlertTriangle, CheckCircle2, Plus, Trash2, Store, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TIPE_LABEL: Record<TipePelanggan, string> = {
@@ -304,14 +304,12 @@ export default function InputPenjualanPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button
-                        type="button" variant="outline" size="sm" 
-                        className="shrink-0 gap-1 text-xs"
+                      <Link
+                        href="/master-buah"
+                        className="shrink-0 inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground transition-colors"
                       >
-                        <Link href="/master-buah">
-                          <Plus className="h-3.5 w-3.5" /> Buat Baru
-                        </Link>
-                      </Button>
+                        <ExternalLink className="h-3 w-3" /> Buat Baru
+                      </Link>
                     </div>
                     {item.errors.buahId && (
                       <p className="text-xs text-red-500">{item.errors.buahId}</p>
