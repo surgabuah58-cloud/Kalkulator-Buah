@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Plus, Pencil, Loader2, Sun, CloudRain } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Sun, CloudRain, AlertCircle } from 'lucide-react'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -74,6 +74,8 @@ export default function MasterBuahPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingBuah, setEditingBuah] = useState<BuahRow | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [deletingBuah, setDeletingBuah] = useState<BuahRow | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const form = useForm<BuahFormValues>({
     resolver: zodResolver(buahSchema),
@@ -116,6 +118,30 @@ export default function MasterBuahPage() {
   // ============================================================
   // HANDLERS
   // ============================================================
+  // ============================================================
+  // AUTO-GENERATE KODE dari nama (hanya saat tambah baru)
+  // ============================================================
+  const watchedNama = form.watch('nama')
+  useEffect(() => {
+    if (editingBuah) return // jangan override saat edit
+    if (!watchedNama || watchedNama.trim() === '') return
+
+    // Ambil 3 huruf pertama dari kata pertama, uppercase
+    const firstWord  = watchedNama.trim().split(/\s+/)[0]
+    const prefix     = firstWord.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()
+    if (prefix.length < 1) return
+
+    // Hitung kode yang sudah ada dengan prefix yang sama
+    const existing   = buahList
+      .map(b => b.kode ?? '')
+      .filter(k => k.startsWith(prefix + '-'))
+      .map(k => parseInt(k.slice(prefix.length + 1)) || 0)
+    const nextNum    = existing.length > 0 ? Math.max(...existing) + 1 : 1
+    const suggested  = `${prefix}-${String(nextNum).padStart(2, '0')}`
+
+    form.setValue('kode', suggested)
+  }, [watchedNama])
+
   function openAddDialog() {
     setEditingBuah(null)
     form.reset({
@@ -185,6 +211,20 @@ export default function MasterBuahPage() {
       }
     }
     setIsSaving(false)
+  }
+
+  async function deleteBuah() {
+    if (!deletingBuah) return
+    setIsDeleting(true)
+    const { error } = await supabase.from('buah').delete().eq('id', deletingBuah.id)
+    if (error) {
+      toast.error('Gagal menghapus: ' + error.message)
+    } else {
+      toast.success(`Buah "${deletingBuah.nama}" berhasil dihapus`)
+      setDeletingBuah(null)
+      fetchBuah()
+    }
+    setIsDeleting(false)
   }
 
   async function toggleActive(buah: BuahRow) {
@@ -308,14 +348,22 @@ export default function MasterBuahPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right pr-6">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(buah)}
-                        className="h-8 w-8"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={() => openEditDialog(buah)}
+                          className="h-8 w-8"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={() => setDeletingBuah(buah)}
+                          className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -491,6 +539,34 @@ export default function MasterBuahPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Konfirmasi Hapus */}
+      <Dialog open={!!deletingBuah} onOpenChange={open => { if (!open) setDeletingBuah(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Hapus Buah
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-muted-foreground">
+            Yakin ingin menghapus <span className="font-semibold text-foreground">&quot;{deletingBuah?.nama}&quot;</span>?
+            <br />
+            <span className="text-xs text-red-500 mt-1 block">
+              Data riwayat pembelian tidak akan terhapus, tapi buah tidak akan muncul di form transaksi.
+            </span>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingBuah(null)} disabled={isDeleting}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={deleteBuah} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Hapus
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

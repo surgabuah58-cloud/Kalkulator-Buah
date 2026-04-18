@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSeason } from '@/context/season-context'
 import { calculateHpp, formatRupiahFull, formatKg, formatPersen } from '@/lib/calculations/hpp'
 import type { BuahRow, PemasokRow } from '@/types/database.types'
+import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +18,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { AlertTriangle, Calculator, Loader2, Sun, CloudRain, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Calculator, Loader2, Sun, CloudRain, Plus, Trash2, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ============================================================
@@ -375,25 +376,33 @@ export default function InputPembelianPage() {
                   {/* Pilih Buah */}
                   <div className="space-y-1.5">
                     <Label>Buah <span className="text-red-500">*</span></Label>
-                    <Select
-                      value={item.buahId}
-                      onValueChange={v => {
-                        const newErrors = { ...item.errors }
-                        delete newErrors.buahId
-                        updateItem(item.key, { buahId: v ?? '', satuanOverride: undefined, errors: newErrors })
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih buah...">
-                          {buahList.find(b => b.id === item.buahId)?.nama ?? null}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        {buahList.map(b => (
-                          <SelectItem key={b.id} value={b.id}>{b.nama}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={item.buahId}
+                        onValueChange={v => {
+                          const newErrors = { ...item.errors }
+                          delete newErrors.buahId
+                          updateItem(item.key, { buahId: v ?? '', satuanOverride: undefined, errors: newErrors })
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Pilih buah...">
+                            {buahList.find(b => b.id === item.buahId)?.nama ?? null}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          {buahList.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.nama}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Link
+                        href="/master-buah"
+                        className="shrink-0 inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Buat Baru
+                      </Link>
+                    </div>
                     {item.errors.buahId && (
                       <p className="text-xs text-red-500">{item.errors.buahId}</p>
                     )}
